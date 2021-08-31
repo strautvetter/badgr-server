@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'badgrsocialauth.providers.kony',
     'badgrsocialauth.providers.twitter',
     'allauth.socialaccount.providers.azure',
+    'allauth.socialaccount.providers.auth0',
     'allauth.socialaccount.providers.google',
     'allauth.socialaccount.providers.linkedin_oauth2',
     'allauth.socialaccount.providers.oauth2',
@@ -157,7 +158,7 @@ AUTHENTICATION_BACKENDS = [
 
 ]
 
-ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http'
 ACCOUNT_ADAPTER = 'mainsite.account_adapter.BadgrAccountAdapter'
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
 ACCOUNT_EMAIL_REQUIRED = True
@@ -183,6 +184,9 @@ SOCIALACCOUNT_PROVIDERS = {
     },
     'linkedin_oauth2': {
         'VERIFIED_EMAIL': True
+    },
+    'auth0': {
+        'AUTH0_URL': 'https://mybadges.eu.auth0.com',
     }
 }
 SOCIALACCOUNT_ADAPTER = 'badgrsocialauth.adapter.BadgrSocialAccountAdapter'
