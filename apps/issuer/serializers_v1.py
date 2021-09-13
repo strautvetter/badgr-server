@@ -255,7 +255,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, 
                 #     raise BadgrValidationError(
                 #         error_code=999,
                 #         error_message=f"extensions @context invalid {ext['@context']}")
-                if ext_name.endswith('ECTSExtension') or ext_name.endswith('StudyLoadExtension'):
+                if ext_name.endswith('ECTSExtension') or ext_name.endswith('StudyLoadExtension') or ext_name.endswith('CategoryExtension'):
                     is_formal = True
         self.formal = is_formal
         return extensions
