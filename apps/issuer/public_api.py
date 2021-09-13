@@ -25,10 +25,11 @@ from rest_framework.views import APIView
 import badgrlog
 from . import utils
 from backpack.models import BackpackCollection
-from entity.api import VersionedObjectMixin
+from entity.api import VersionedObjectMixin, BaseEntityListView, UncachedPaginatedViewMixin
 from mainsite.models import BadgrApp
 from mainsite.utils import (OriginSetting, set_url_query_params, first_node_match, fit_image_to_height,
                             convert_svg_to_png)
+from .serializers_v1 import BadgeClassSerializerV1, IssuerSerializerV1
 from .models import Issuer, BadgeClass, BadgeInstance
 logger = badgrlog.BadgrLogger()
 
@@ -63,6 +64,28 @@ class SlugToEntityIdRedirectMixin(object):
         else:
             raise Http404
 
+class JSONListView(BaseEntityListView, UncachedPaginatedViewMixin):
+    """
+    Abstract List Class
+    """
+    permission_classes = (permissions.AllowAny,)
+    allow_any_unauthenticated_access = True
+
+    def log(self, obj):
+        pass
+
+    def get(self, request, **kwargs):
+        objects = self.model.objects
+        context = self.get_context_data(**kwargs)
+        serializer_class = self.serializer_class
+        serializer = serializer_class(objects, many=True, context=context)
+        headers = dict()
+        paginator = getattr(self, 'paginator', None)
+        if paginator and callable(getattr(paginator, 'get_link_header', None)):
+            link_header = paginator.get_link_header()
+            if link_header:
+                headers['Link'] = link_header
+        return Response(serializer.data, headers=headers)
 
 class JSONComponentView(VersionedObjectMixin, APIView, SlugToEntityIdRedirectMixin):
     """
@@ -300,6 +323,18 @@ class IssuerImage(ImagePropertyDetailView):
         logger.event(badgrlog.IssuerImageRetrievedEvent(obj, self.request))
 
 
+class IssuerList(JSONListView):
+    permission_classes = (permissions.AllowAny,)
+    model = Issuer
+    serializer_class = IssuerSerializerV1
+
+    def log(self, obj):
+        pass
+
+    def get_json(self, request):
+        return super(IssuerList, self).get_json(request)
+
+
 class BadgeClassJson(JSONComponentView):
     permission_classes = (permissions.AllowAny,)
     model = BadgeClass
@@ -330,6 +365,19 @@ class BadgeClassJson(JSONComponentView):
             public_url=self.current_object.public_url,
             image_url=image_url
         )
+
+
+
+class BadgeClassList(JSONListView):
+    permission_classes = (permissions.AllowAny,)
+    model = BadgeClass
+    serializer_class = BadgeClassSerializerV1
+
+    def log(self, obj):
+        logger.event(badgrlog.BadgeClassRetrievedEvent(obj, self.request))
+
+    def get_json(self, request):
+        return super(BadgeClassList, self).get_json(request)
 
 
 class BadgeClassImage(ImagePropertyDetailView):
