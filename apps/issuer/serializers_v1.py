@@ -96,6 +96,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     url = serializers.URLField(max_length=1024, required=True)
     staff = IssuerStaffSerializerV1(read_only=True, source='cached_issuerstaff', many=True)
     badgrapp = serializers.CharField(read_only=True, max_length=255, source='cached_badgrapp')
+    verified = serializers.BooleanField(default=False)
 
     class Meta:
         apispec_definition = ('Issuer', {})

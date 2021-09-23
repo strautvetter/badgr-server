@@ -201,6 +201,8 @@ class Issuer(ResizeUploadedImage,
     email = models.CharField(max_length=254, blank=True, null=True, default=None)
     old_json = JSONField()
 
+    verified = models.BooleanField(null=False, default=False)
+
     objects = IssuerManager()
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
 
