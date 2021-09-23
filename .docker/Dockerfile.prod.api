@@ -17,7 +17,7 @@ COPY manage.py                          /badgr_server
 COPY .docker/etc/uwsgi.ini              /badgr_server
 COPY .docker/etc/wsgi.py                /badgr_server
 COPY apps                               /badgr_server/apps
-COPY .docker/etc/settings_local.prod.py /badgr_server/apps/mainsite/settings_local.py
+COPY .docker/etc/settings_local.py      /badgr_server/apps/mainsite/
 
 RUN pip install uwsgi
 RUN pip install -r requirements.txt
