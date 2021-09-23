@@ -8,5 +8,5 @@ search_string="http://localhost:8000"
 
 for d in apps/mainsite/static/extensions/*/context.json ; do
     echo "editing $d"
-    sed -i '' "s#$search_string#$1#g" "$d"
+    sed -i "s#$search_string#$1#g" "$d"
 done
