@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "Level Extension",
+  "description": "An extension that allows you to add a level to a badgeclass object.",
+  "type": "object",
+  "properties": {
+    "Category": {
+      "type": "string"
+    }
+  },
+  "required": ["Level"]
+}

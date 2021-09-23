@@ -1,6 +1,11 @@
+from apps import badgrlog
 import os
 import pytz
 import uuid
+import json
+
+import logging
+
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.urls import reverse
@@ -8,6 +13,7 @@ from django.core.validators import EmailValidator, URLValidator
 from django.db.models import Q
 from django.utils.html import strip_tags
 from django.utils import timezone
+from django.conf import settings
 from rest_framework import serializers
 
 from . import utils
@@ -17,9 +23,43 @@ from mainsite.models import BadgrApp
 from mainsite.serializers import DateTimeWithUtcZAtEndField, HumanReadableBooleanField, StripTagsCharField, MarkdownCharField, \
     OriginalJsonSerializerMixin
 from mainsite.utils import OriginSetting
+from mainsite.exceptions import BadgrValidationError, BadgrValidationFieldError
 from mainsite.validators import ChoicesValidator, BadgeExtensionValidator, PositiveIntegerValidator, TelephoneValidator
-from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance, RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL
+from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance, BadgeClassExtension, RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL
 
+logger = logging.getLogger(__name__)
+
+class ExtensionsSaverMixin(object):
+    def remove_extensions(self, instance, extensions_to_remove):
+        extensions = instance.cached_extensions()
+        for ext in extensions:
+            if ext.name in extensions_to_remove:
+                ext.delete()
+
+    def update_extensions(self, instance, extensions_to_update, received_extension_items):
+        logger.debug("UPDATING EXTENSION")
+        logger.debug(received_extension_items)
+        current_extensions = instance.cached_extensions()
+        for ext in current_extensions:
+            if ext.name in extensions_to_update:
+                new_values = received_extension_items[ext.name]
+                ext.original_json = json.dumps(new_values)
+                ext.save()
+
+    def save_extensions(self, validated_data, instance):
+        logger.debug("SAVING EXTENSION IN MIXIN")
+        logger.debug(validated_data.get('extension_items', False))
+        if validated_data.get('extension_items', False):
+            extension_items = validated_data.pop('extension_items')
+            received_extensions = list(extension_items.keys())
+            current_extension_names = list(instance.extension_items.keys())
+            remove_these_extensions = set(current_extension_names) - set(received_extensions)
+            update_these_extensions = set(current_extension_names).intersection(set(received_extensions))
+            add_these_extensions = set(received_extensions) - set(current_extension_names)
+            logger.debug(add_these_extensions)
+            self.remove_extensions(instance, remove_these_extensions)
+            self.update_extensions(instance, update_these_extensions, extension_items)
+            self.add_extensions(instance, add_these_extensions, extension_items)
 
 class CachedListSerializer(serializers.ListSerializer):
     def to_representation(self, data):
@@ -56,6 +96,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     url = serializers.URLField(max_length=1024, required=True)
     staff = IssuerStaffSerializerV1(read_only=True, source='cached_issuerstaff', many=True)
     badgrapp = serializers.CharField(read_only=True, max_length=255, source='cached_badgrapp')
+    verified = serializers.BooleanField(default=False)
 
     class Meta:
         apispec_definition = ('Issuer', {})
@@ -153,7 +194,7 @@ class BadgeClassExpirationSerializerV1(serializers.Serializer):
     duration = serializers.ChoiceField(source='expires_duration', allow_null=True, choices=BadgeClass.EXPIRES_DURATION_CHOICES)
 
 
-class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
+class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, serializers.Serializer):
     created_at = DateTimeWithUtcZAtEndField(read_only=True)
     created_by = BadgeUserIdentifierFieldV1()
     id = serializers.IntegerField(required=False, read_only=True)
@@ -168,6 +209,8 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
 
     alignment = AlignmentItemSerializerV1(many=True, source='alignment_items', required=False)
     tags = serializers.ListField(child=StripTagsCharField(max_length=1024), source='tag_items', required=False)
+
+    extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
 
     expires = BadgeClassExpirationSerializerV1(source='*', required=False, allow_null=True)
 
@@ -205,7 +248,32 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
         else:
             return None
 
+    def validate_extensions(self, extensions):
+        is_formal = False
+        if extensions:
+            for ext_name, ext in extensions.items():
+                # if "@context" in ext and not ext['@context'].startswith(settings.EXTENSIONS_ROOT_URL):
+                #     raise BadgrValidationError(
+                #         error_code=999,
+                #         error_message=f"extensions @context invalid {ext['@context']}")
+                if ext_name.endswith('ECTSExtension') or ext_name.endswith('StudyLoadExtension') or ext_name.endswith('CategoryExtension') or ext_name.endswith('LevelExtension'):
+                    is_formal = True
+        self.formal = is_formal
+        return extensions
+
+    def add_extensions(self, instance, add_these_extensions, extension_items):
+        for extension_name in add_these_extensions:
+            original_json = extension_items[extension_name]
+            extension = BadgeClassExtension(name=extension_name,
+                                            original_json=json.dumps(original_json),
+                                            badgeclass_id=instance.pk)
+            extension.save()
+
+
     def update(self, instance, validated_data):
+        logger.info("UPDATE BADGECLASS")
+        logger.debug(validated_data)
+
         force_image_resize = False
 
         new_name = validated_data.get('name')
@@ -243,6 +311,9 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
         instance.expires_amount = validated_data.get('expires_amount', None)
         instance.expires_duration = validated_data.get('expires_duration', None)
 
+        logger.debug("SAVING EXTENSION")
+        self.save_extensions(validated_data, instance)
+
         instance.save(force_resize=force_image_resize)
 
         return instance
@@ -265,6 +336,9 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer
         return data
 
     def create(self, validated_data, **kwargs):
+
+        logger.info("CREATE NEW BADGECLASS")
+        logger.debug(validated_data)
 
         if 'image' not in validated_data:
             raise serializers.ValidationError({"image": ["This field is required"]})
