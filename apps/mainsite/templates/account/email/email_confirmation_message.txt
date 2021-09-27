@@ -1,11 +1,10 @@
-Please confirm your email address on Badgr,
+Bitte bestätige Deine Email-Adresse auf myBadges,
 {{ email.email }}
 
-A Badgr user has requested to add this email to their account or use it in a connected application.
-Once confirmed, you may upload badges to your Badgr account that have been issued to this address
-or use features within connected applications.
+Ein*e myBadges Nutzer*in hat angefragt diese Email-Adresse zu ihrem/seinem Account hinzuzufügen oder sie in einer verknüpften Anwendung zu nutzen.
+Wenn bestätigt, kannst Du Badges zu Deinem myBadges Account hinzufügen, die zu dieser Adresse ausgestellt wurden oder features in verknüpften Anwendungen nutzen.
 
 {{ activate_url }}
 
-If you didn't make this request, you can safely ignore this email, and
-no action will be taken on your behalf.
+Wenn Du dies nicht angefragt hast, kannst Du sicher diese Email ignorieren und 
+es wird nichts weiter passieren. 
