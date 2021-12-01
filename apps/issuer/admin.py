@@ -37,7 +37,7 @@ class IssuerAdmin(DjangoObjectActions, ModelAdmin):
             'classes': ("collapse",)
         }),
         (None, {
-            'fields': ('image', 'name', 'url', 'email', 'verified', 'description', 'badgrapp')
+            'fields': ('image', 'name', 'url', 'email', 'verified', 'description', 'category', 'street', 'streetnumber', 'zip', 'city', 'badgrapp', 'lat', 'lon')
         }),
         ('JSON', {
             'fields': ('old_json',)

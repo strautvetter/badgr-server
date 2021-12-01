@@ -41,6 +41,8 @@ from mainsite.utils import OriginSetting, generate_entity_uri
 from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, generate_rebaked_filename,
                     generate_sha256_hashstring, get_obi_context, parse_original_datetime, UNVERSIONED_BAKED_VERSION)
 
+from geopy.geocoders import Nominatim
+
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
 RECIPIENT_TYPE_EMAIL = 'email'
@@ -183,7 +185,7 @@ class Issuer(ResizeUploadedImage,
              BaseOpenBadgeObjectModel):
     entity_class_name = 'Issuer'
     COMPARABLE_PROPERTIES = ('badgrapp_id', 'description', 'email', 'entity_id', 'entity_version', 'name', 'pk',
-                            'updated_at', 'url',)
+                            'updated_at', 'url')
 
     staff = models.ManyToManyField(AUTH_USER_MODEL, through='IssuerStaff')
 
@@ -205,6 +207,26 @@ class Issuer(ResizeUploadedImage,
 
     objects = IssuerManager()
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
+    
+    category = models.CharField(max_length=255, null=False, default='n/a')
+
+    #address fields
+    street = models.CharField(max_length=255, null=True, blank=True)
+    streetnumber = models.CharField(max_length=255, null=True, blank=True)
+    zip = models.CharField(max_length=255, null=True, blank=True)
+    city = models.CharField(max_length=255, null=True, blank=True)
+    country = models.CharField(max_length=255, null=True, blank=True)
+    
+    lat = models.FloatField(null=True, blank=True)
+    lon = models.FloatField(null=True, blank=True)
+
+    __original_address = {
+        'street': None,
+        'streetnumber': None,
+        'zip': None,
+        'city': None,
+        'country': None
+    }
 
     def publish(self, publish_staff=True, *args, **kwargs):
         fields_cache = self._state.fields_cache  # stash the fields cache to avoid publishing related objects here
@@ -248,7 +270,25 @@ class Issuer(ResizeUploadedImage,
 
         return ret
 
+    # override init method to save original address
+    def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.__original_address = { 'street': self.street, 'streetnumber': self.streetnumber, 'city': self.city, 'zip': self.zip, 'country': self.country }
+
     def save(self, *args, **kwargs):
+        if not self.pk:
+            self.notify_admins(self)
+       
+        #geocoding if address in model changed
+        if self.__original_address:
+            if (self.street != self.__original_address['street'] or self.streetnumber != self.__original_address['streetnumber'] or self.city != self.__original_address['city'] or self.zip != self.__original_address['zip'] or self.country != self.__original_address['country']):
+                addr_string = (self.street if self.street != None else '') +" "+ (str(self.streetnumber) if self.streetnumber != None else '') +" "+ (str(self.zip) if self.zip != None else '')+" "+ (str(self.city) if self.city != None else '') + " Deutschland"
+                nom = Nominatim(user_agent="myBadges")
+                geoloc = nom.geocode(addr_string)
+                if geoloc:
+                    self.lon = geoloc.longitude
+                    self.lat = geoloc.latitude
+        
         ret = super(Issuer, self).save(*args, **kwargs)
 
         # if no owner staff records exist, create one for created_by
@@ -351,7 +391,8 @@ class Issuer(ResizeUploadedImage,
             name=self.name,
             url=self.url,
             email=self.email,
-            description=self.description))
+            description=self.description,
+            category=self.category))
 
         image_url = self.image_url(public=True)
         json['image'] = image_url
@@ -399,6 +440,46 @@ class Issuer(ResizeUploadedImage,
 
     def has_nonrevoked_assertions(self):
         return self.badgeinstance_set.filter(revoked=False).exists()
+
+    def notify_admins(self, badgr_app=None, renotify=False):
+        """
+        Sends an email notification to the badge recipient.
+        """
+
+        if badgr_app is None:
+            badgr_app = self.cached_issuer.cached_badgrapp
+        if badgr_app is None:
+            badgr_app = BadgrApp.objects.get_current(None)
+
+        print(badgr_app)
+        UserModel = get_user_model()
+        users = UserModel.objects.filter(is_staff=True)
+
+        email_context = {
+            # 'badge_name': self.badgeclass.name,
+            # 'badge_id': self.entity_id,
+            # 'badge_description': self.badgeclass.description,
+            # 'help_email': getattr(settings, 'HELP_EMAIL', 'help@badgr.io'),
+            'issuer_name': re.sub(r'[^\w\s]+', '', self.name, 0, re.I),
+            'users': users,
+            # 'issuer_email': self.issuer.email,
+            # 'issuer_detail': self.issuer.public_url,
+            # 'issuer_image_url': issuer_image_url,
+            # 'badge_instance_url': self.public_url,
+            # 'image_url': self.public_url + '/image?type=png',
+            # 'download_url': self.public_url + "?action=download",
+            'site_name': "mybadges.org"
+            # 'badgr_app': badgr_app
+        }
+
+
+        template_name = 'issuer/email/notify_admins'
+
+        adapter = get_adapter()
+        for user in users:
+            adapter.send_mail(template_name, user.email, context=email_context)
+            
+
 
 class IssuerStaff(cachemodel.CacheModel):
     ROLE_OWNER = 'owner'

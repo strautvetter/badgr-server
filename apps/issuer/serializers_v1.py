@@ -98,6 +98,17 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     badgrapp = serializers.CharField(read_only=True, max_length=255, source='cached_badgrapp')
     verified = serializers.BooleanField(default=False)
 
+    category = serializers.CharField(max_length=255, required=True, allow_null=True)
+
+    street = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    streetnumber = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    zip = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    city = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    country = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+   
+    lat = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    lon = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         apispec_definition = ('Issuer', {})
 
@@ -117,6 +128,14 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
 
         new_issuer = Issuer(**validated_data)
 
+        new_issuer.category = validated_data.get('category')
+        new_issuer.street = validated_data.get('street')
+        new_issuer.streetnumber = validated_data.get('streetnumber')
+        new_issuer.zip = validated_data.get('zip')
+        new_issuer.city = validated_data.get('city')
+        new_issuer.country = validated_data.get('country')
+
+
         # set badgrapp
         new_issuer.badgrapp = BadgrApp.objects.get_current(self.context.get('request', None))
 
@@ -134,6 +153,13 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
         instance.email = validated_data.get('email')
         instance.description = validated_data.get('description')
         instance.url = validated_data.get('url')
+        
+        instance.category = validated_data.get('category')
+        instance.street = validated_data.get('street')
+        instance.streetnumber = validated_data.get('streetnumber')
+        instance.zip = validated_data.get('zip')
+        instance.city = validated_data.get('city')
+        instance.country = validated_data.get('country')
 
         # set badgrapp
         if not instance.badgrapp_id:
@@ -213,6 +239,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, 
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
 
     expires = BadgeClassExpirationSerializerV1(source='*', required=False, allow_null=True)
+    # issuerName = StripTagsCharField(max_length=255)
 
     class Meta:
         apispec_definition = ('BadgeClass', {})
@@ -226,6 +253,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, 
 
     def to_representation(self, instance):
         representation = super(BadgeClassSerializerV1, self).to_representation(instance)
+        representation['issuerName'] = instance.cached_issuer.name
         representation['issuer'] = OriginSetting.HTTP+reverse('issuer_json', kwargs={'entity_id': instance.cached_issuer.entity_id})
         representation['json'] = instance.get_json(obi_version='1_1', use_canonical_id=True)
         return representation
