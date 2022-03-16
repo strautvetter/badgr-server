@@ -150,7 +150,7 @@ class MarkdownCharFieldValidator(object):
 
 
 class MarkdownCharField(StripTagsCharField):
-    default_validators = [MarkdownCharFieldValidator()]
+    default_validators = []
 
 
 class LegacyVerifiedAuthTokenSerializer(AuthTokenSerializer):
