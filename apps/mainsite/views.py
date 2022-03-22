@@ -26,7 +26,8 @@ from mainsite.serializers import LegacyVerifiedAuthTokenSerializer
 import badgrlog
 
 from django.views.decorators.csrf import csrf_exempt
-from django.core.files.storage import FileSystemStorage
+from django.core.files.storage import DefaultStorage
+
 import uuid
 from django.http import JsonResponse
 
@@ -71,8 +72,8 @@ def upload(req):
         file_extension = uploaded_file.name.split(".")[-1]
         random_filename = str(uuid.uuid4())
         final_filename = random_filename + "." + file_extension
-        fs = FileSystemStorage()
-        fs.save(final_filename, uploaded_file)
+        store = DefaultStorage()
+        store.save(final_filename, uploaded_file)
     return JsonResponse({'filename': final_filename})
 
 def email_unsubscribe_response(request, message, error=False):
