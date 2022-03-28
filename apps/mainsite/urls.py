@@ -21,6 +21,9 @@ from mainsite.views import (SitewideActionFormView, RedirectToUiLogin, DocsAutho
                             LegacyLoginAndObtainAuthToken,)
 from mainsite.views import info_view, email_unsubscribe, AppleAppSiteAssociation, error404, error500
 
+from mainsite.views import upload
+from django.conf.urls.static import static
+
 urlpatterns = [
     # Backup URLs in case the server isn't serving these directly
     url(r'^favicon\.png[/]?$', RedirectView.as_view(url='%simages/favicon.png' % settings.STATIC_URL, permanent=True)),
@@ -100,8 +103,10 @@ urlpatterns = [
     url(r'^v1/externaltools/', include('externaltools.v1_api_urls'), kwargs={'version': 'v1'}),
     url(r'^v2/externaltools/', include('externaltools.v2_api_urls'), kwargs={'version': 'v2'}),
 
-
+    url(r'^upload', upload, name="image_upload"),
 ]
+# add to serve files
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # Test URLs to allow you to see these pages while DEBUG is True
 if getattr(settings, 'DEBUG_ERRORS', False):

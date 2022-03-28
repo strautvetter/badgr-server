@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.urls import reverse_lazy
 from django.db import IntegrityError
-from django.http import HttpResponseServerError, HttpResponseNotFound, HttpResponseRedirect
+from django.http import HttpResponseServerError, HttpResponseNotFound, HttpResponseRedirect, HttpResponse
 from django.shortcuts import redirect
 from django.template import loader
 from django.template.exceptions import TemplateDoesNotExist
@@ -25,8 +25,14 @@ from mainsite.models import EmailBlacklist, BadgrApp
 from mainsite.serializers import LegacyVerifiedAuthTokenSerializer
 import badgrlog
 
+from django.views.decorators.csrf import csrf_exempt
+from django.core.files.storage import DefaultStorage
+
+import uuid
+from django.http import JsonResponse
 
 logger = badgrlog.BadgrLogger()
+
 
 
 ##
@@ -59,6 +65,16 @@ def error500(request, *args, **kwargs):
 def info_view(request, *args, **kwargs):
     return redirect(getattr(settings, 'LOGIN_REDIRECT_URL'))
 
+@csrf_exempt
+def upload(req):
+    if req.method == 'POST':
+        uploaded_file = req.FILES['files']
+        file_extension = uploaded_file.name.split(".")[-1]
+        random_filename = str(uuid.uuid4())
+        final_filename = random_filename + "." + file_extension
+        store = DefaultStorage()
+        store.save(final_filename, uploaded_file)
+    return JsonResponse({'filename': final_filename})
 
 def email_unsubscribe_response(request, message, error=False):
     badgr_app_pk = request.GET.get('a', None)
