@@ -465,6 +465,10 @@ class BadgeUser(BaseVersionedEntity, AbstractUser, cachemodel.CacheModel):
         return BadgeInstance.objects.filter(recipient_identifier__in=self.all_recipient_identifiers)
 
     @cachemodel.cached_method(auto_publish=True)
+    def get_badges_from_user(self):
+        return BadgeInstance.objects.filter(recipient_identifier__in=self.all_recipient_identifiers)
+
+    @cachemodel.cached_method(auto_publish=True)
     def cached_externaltools(self):
         return [a.cached_externaltool for a in self.externaltooluseractivation_set.filter(is_active=True)]
 

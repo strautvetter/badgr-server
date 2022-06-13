@@ -5,7 +5,7 @@ from django.conf.urls import url
 
 from backpack.api import BackpackAssertionList, BackpackAssertionDetail, BackpackCollectionList, \
     BackpackCollectionDetail, BackpackAssertionDetailImage, BackpackImportBadge, ShareBackpackCollection, \
-    ShareBackpackAssertion
+    ShareBackpackAssertion, BadgesFromUser
 
 urlpatterns = [
     url(r'^import$', BackpackImportBadge.as_view(), name='v2_api_backpack_import_badge'),
@@ -19,4 +19,6 @@ urlpatterns = [
 
     url(r'^share/assertion/(?P<entity_id>[^/]+)$', ShareBackpackAssertion.as_view(), name='v2_api_share_assertion'),
     url(r'^share/collection/(?P<entity_id>[^/]+)$', ShareBackpackCollection.as_view(), name='v2_api_share_collection'),
+
+    url(r'^(?P<email>[^/]+)$', BadgesFromUser().as_view(), name='v2_api_badges_from_user'),
 ]

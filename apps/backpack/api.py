@@ -20,7 +20,9 @@ from issuer.permissions import AuditedModelOwner, VerifiedEmailMatchesRecipientI
 from issuer.public_api import ImagePropertyDetailView
 from apispec_drf.decorators import apispec_list_operation, apispec_post_operation, apispec_get_operation, \
     apispec_delete_operation, apispec_put_operation, apispec_operation
-from mainsite.permissions import AuthenticatedWithVerifiedIdentifier
+from mainsite.permissions import AuthenticatedWithVerifiedIdentifier, IsServerAdmin
+
+from badgeuser.models import BadgeUser
 
 logger = badgrlog.BadgrLogger()
 
@@ -212,6 +214,31 @@ class BackpackAssertionDetailImage(ImagePropertyDetailView, BadgrOAuthTokenHasSc
     model = BadgeInstance
     prop = 'image'
     valid_scopes = ['r:backpack', 'rw:backpack']
+
+
+class BadgesFromUser(BaseEntityListView):
+    model = BadgeInstance
+    v1_serializer_class = LocalBadgeInstanceUploadSerializerV1
+    v2_serializer_class = BackpackAssertionSerializerV2
+    permission_classes = (AuthenticatedWithVerifiedIdentifier, AuditedModelOwner, BadgrOAuthTokenHasScope, IsServerAdmin)
+    valid_scopes = {
+        'get': ['rw:serverAdmin'],
+    }
+
+    def get_objects(self, request, **kwargs):
+        email = kwargs.get('email')
+        try:
+            user = BadgeUser.cached.get(email=email)
+            return list(user.get_badges_from_user())
+        except: BadgeUser.DoesNotExist
+        raise ValueError('User not found')
+
+    @apispec_get_operation(['BadgeInstance'],
+                           summary='Get a list of Badges',
+                           tags=['Backpack']
+                           )
+    def get(self, request, **kwargs):
+        return super(BadgesFromUser, self).get(request, **kwargs)
 
 
 class BackpackCollectionList(BaseEntityListView):
