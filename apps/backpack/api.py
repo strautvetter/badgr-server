@@ -220,7 +220,7 @@ class BadgesFromUser(BaseEntityListView):
     model = BadgeInstance
     v1_serializer_class = LocalBadgeInstanceUploadSerializerV1
     v2_serializer_class = BackpackAssertionSerializerV2
-    permission_classes = (AuthenticatedWithVerifiedIdentifier, AuditedModelOwner, BadgrOAuthTokenHasScope, IsServerAdmin)
+    permission_classes =  (IsServerAdmin,)
     valid_scopes = {
         'get': ['rw:serverAdmin'],
     }
