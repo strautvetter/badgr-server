@@ -28,6 +28,7 @@ class BackpackAssertionSerializerV2(DetailSerializerV2, OriginalJsonSerializerMi
     issuer = EntityRelatedFieldV2(source='cached_issuer', required=False, queryset=Issuer.cached)
     issuerOpenBadgeId = serializers.URLField(source='issuer_jsonld_id', read_only=True)
 
+    name = serializers.CharField(source='cached_badgeclass.name', read_only=True)
     image = serializers.FileField(read_only=True)
     recipient = BadgeRecipientSerializerV2(source='*')
     issuedOn = DateTimeWithUtcZAtEndField(source='issued_on', read_only=True)
