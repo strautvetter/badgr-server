@@ -6,7 +6,6 @@
   "properties": {
     "BasedOn": {
       "type": "object",
-      "required": ["slug", "issuerSlug"],
       "properties": {
         "slug": {
           "type": "number"
