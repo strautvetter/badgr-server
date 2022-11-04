@@ -4,7 +4,7 @@
   "description": "An extension that allows you to add a level to a badgeclass object.",
   "type": "object",
   "properties": {
-    "Category": {
+    "Level": {
       "type": "string"
     }
   },
