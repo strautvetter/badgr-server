@@ -8,7 +8,7 @@
       "type": "object",
       "properties": {
         "slug": {
-          "type": "number"
+          "type": "string"
         },
         "issuerSlug": {
           "type": "string"
