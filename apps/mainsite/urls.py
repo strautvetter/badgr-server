@@ -21,7 +21,7 @@ from mainsite.views import (SitewideActionFormView, RedirectToUiLogin, DocsAutho
                             LegacyLoginAndObtainAuthToken,)
 from mainsite.views import info_view, email_unsubscribe, AppleAppSiteAssociation, error404, error500
 
-from mainsite.views import upload
+from mainsite.views import upload, nounproject
 from django.conf.urls.static import static
 
 urlpatterns = [
@@ -104,6 +104,7 @@ urlpatterns = [
     url(r'^v2/externaltools/', include('externaltools.v2_api_urls'), kwargs={'version': 'v2'}),
 
     url(r'^upload', upload, name="image_upload"),
+    url(r'^nounproject/(?P<searchterm>[^/]+)/(?P<page>[^/]+)$', nounproject, name="nounproject"),
 ]
 # add to serve files
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
