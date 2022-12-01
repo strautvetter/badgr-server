@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "Original Image Extension",
+  "description": "An extension that allows you to save the original image too, without border.",
+  "type": "object",
+  "properties": {
+    "OrgImage": {
+      "type": "string"
+    }
+  },
+  "required": ["OrgImage"]
+}

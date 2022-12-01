@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "title": "Based On Extension",
+  "description": "An extension that allows you to reference the badgeclass on which this badgeclass is based on.",
+  "type": "object",
+  "properties": {
+    "BasedOn": {
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "issuerSlug": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "required": ["BasedOn"]
+}
