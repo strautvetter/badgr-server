@@ -14,11 +14,13 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import FormView, RedirectView
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+from rest_framework.decorators import permission_classes, authentication_classes, api_view
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication, TokenAuthentication
 
 from issuer.tasks import rebake_all_assertions, update_issuedon_all_assertions
 from mainsite.admin_actions import clear_cache
@@ -48,7 +50,7 @@ def error404(request, *args, **kwargs):
     try:
         template = loader.get_template('error/404.html')
     except TemplateDoesNotExist:
-        return HttpResponseServerError('<h1>Page not found (404)</h1>', content_type='text/html')
+        return HttpResponseServerError('<h1>Pagse not found (404)</h1>', content_type='text/html')
     return HttpResponseNotFound(template.render({
         'STATIC_URL': getattr(settings, 'STATIC_URL', '/static/'),
     }))
@@ -79,6 +81,9 @@ def upload(req):
         store.save(final_filename, uploaded_file)
     return JsonResponse({'filename': final_filename})
 
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication, SessionAuthentication, BasicAuthentication])
+@permission_classes([IsAuthenticated])
 def nounproject(req, searchterm, page):
     if req.method == 'GET':
         attempt_num = 0  # keep track of how many times we've retried
