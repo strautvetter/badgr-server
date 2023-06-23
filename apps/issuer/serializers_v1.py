@@ -99,6 +99,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     verified = serializers.BooleanField(default=False)
 
     category = serializers.CharField(max_length=255, required=True, allow_null=True)
+    source_url = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
 
     street = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     streetnumber = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
