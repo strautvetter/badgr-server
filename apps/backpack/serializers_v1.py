@@ -415,6 +415,7 @@ class V1IssuerSerializer(serializers.Serializer):
     description = BadgeStringField(required=False)
     image = BadgeImageURLField(required=False)
     email = BadgeEmailField(required=False)
+    slug = serializers.CharField(required=False)    
 
 
 class V1BadgeClassSerializer(serializers.Serializer):

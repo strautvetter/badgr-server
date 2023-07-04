@@ -392,7 +392,8 @@ class Issuer(ResizeUploadedImage,
             url=self.url,
             email=self.email,
             description=self.description,
-            category=self.category))
+            category=self.category,
+            slug=self.entity_id))
 
         image_url = self.image_url(public=True)
         json['image'] = image_url
