@@ -99,6 +99,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     verified = serializers.BooleanField(default=False)
 
     category = serializers.CharField(max_length=255, required=True, allow_null=True)
+    source_url = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
 
     street = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     streetnumber = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
@@ -239,7 +240,8 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, 
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
 
     expires = BadgeClassExpirationSerializerV1(source='*', required=False, allow_null=True)
-    # issuerName = StripTagsCharField(max_length=255)
+    
+    source_url = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         apispec_definition = ('BadgeClass', {})
