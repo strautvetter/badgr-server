@@ -50,7 +50,7 @@ def error404(request, *args, **kwargs):
     try:
         template = loader.get_template('error/404.html')
     except TemplateDoesNotExist:
-        return HttpResponseServerError('<h1>Pagse not found (404)</h1>', content_type='text/html')
+        return HttpResponseServerError('<h1>Page not found (404)</h1>', content_type='text/html')
     return HttpResponseNotFound(template.render({
         'STATIC_URL': getattr(settings, 'STATIC_URL', '/static/'),
     }))
@@ -89,16 +89,24 @@ def nounproject(req, searchterm, page):
         attempt_num = 0  # keep track of how many times we've retried
         while attempt_num < 4:
             auth = OAuth1(getattr(settings, 'NOUNPROJECT_API_KEY'), getattr(settings, 'NOUNPROJECT_SECRET'))
-            endpoint = "http://api.thenounproject.com/icons/"+ searchterm +"?limit=10&page="+page
+            endpoint = "http://api.thenounproject.com/v2/icon?query="+ searchterm +"?limit=10&page="+page
             response = requests.get(endpoint, auth=auth)
             if response.status_code == 200:
                 data = response.json()
                 return JsonResponse(data, status=status.HTTP_200_OK)
+            elif response.status_code == 403:
+                # Probably the API KEY / SECRET was wrong
+                return JsonResponse({"error":
+                    "Couldn't authenticate against thenounproject!"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             else:
                 attempt_num += 1
                 # You can probably use a logger to log the error here
                 time.sleep(5)  # Wait for 5 seconds before re-trying
-        return JsonResponse({"error": "Request failed"}, status=response.status_code)
+
+        return JsonResponse({"error":
+            f"Request failed with status code {response.status_code}"},
+            status=response.status_code)
     else:
         return JsonResponse({"error": "Method not allowed"}, status=status.HTTP_400_BAD_REQUEST)
 
