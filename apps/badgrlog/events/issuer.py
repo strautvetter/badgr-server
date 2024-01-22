@@ -1,7 +1,4 @@
 # Created by wiggins@concentricsky.com on 8/27/15.
-from django.conf import settings
-
-from mainsite.utils import OriginSetting
 from .base import BaseBadgrEvent
 
 
@@ -76,4 +73,3 @@ class BadgeAssertionRevokedEvent(BaseBadgrEvent):
             'user': self.user,
             'badgeInstance': self.badge_instance.json
         }
-

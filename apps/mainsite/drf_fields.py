@@ -29,7 +29,8 @@ class Base64FileField(FileField):
 
         try:
             mime, encoded_data = data.replace('data:', '', 1).split(';base64,')
-            extension = self._MIME_MAPPING[mime] if mime in list(self._MIME_MAPPING.keys()) else mimetypes.guess_extension(mime)
+            extension = self._MIME_MAPPING[mime] if mime in list(
+                self._MIME_MAPPING.keys()) else mimetypes.guess_extension(mime)
             if extension is None:
                 raise ValidationError('Invalid MIME type')
             ret = ContentFile(base64.b64decode(encoded_data), name='{name}{extension}'.format(name=str(uuid.uuid4()),
@@ -53,7 +54,8 @@ class ValidImageField(Base64FileField):
     def to_internal_value(self, data):
         # Skip http/https urls to avoid overwriting valid data when, for example, a client GETs and subsequently PUTs an
         # entity containing an image URL.
-        if self.skip_http and not isinstance(data, UploadedFile) and urllib.parse.urlparse(data).scheme in ('http', 'https'):
+        if (self.skip_http and not isinstance(data, UploadedFile)
+                and urllib.parse.urlparse(data).scheme in ('http', 'https')):
             raise SkipField()
 
         self.source_attrs = ['image']  # Kind of a dirty hack, because this is failing to stick if set on init.

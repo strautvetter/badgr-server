@@ -1,5 +1,4 @@
 import base64
-import urllib.request, urllib.parse, urllib.error
 
 from django.core.cache import cache
 from django.test import override_settings
@@ -9,7 +8,6 @@ from oauth2_provider.models import Application
 
 from badgeuser.authcode import encrypt_authcode, decrypt_authcode, authcode_for_accesstoken
 from mainsite.models import AccessTokenProxy
-from issuer.models import Issuer
 from mainsite.models import ApplicationInfo
 from mainsite.tests import BadgrTestCase, SetupIssuerHelper
 from mainsite.utils import backoff_cache_key, set_url_query_params
@@ -69,7 +67,8 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         )
 
         # Including query parameters is just wrong for the token claim process.
-        response = self.client.post(set_url_query_params(reverse('oauth2_provider_token'), **request_data), data=request_data)
+        response = self.client.post(set_url_query_params(
+            reverse('oauth2_provider_token'), **request_data), data=request_data)
         self.assertEqual(response.status_code, 400)
 
         # It is not ok to include all the data in query params
@@ -105,7 +104,7 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
         response = self.client.post(reverse('oauth2_provider_token'), data=request_data)
         self.assertEqual(response.status_code, 200)
         first_token = response.json()['access_token']
-        first_token_instance = AccessTokenProxy.objects.get(token=first_token)
+        AccessTokenProxy.objects.get(token=first_token)
 
         # Do it again... The token should update its "token" value.
         response = self.client.post(reverse('oauth2_provider_token'), data=request_data)
@@ -141,7 +140,8 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
             authorization_grant_type=Application.GRANT_PASSWORD
         )
         ApplicationInfo.objects.create(application=application)
-        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(user, application=application, scope='r:profile')
+        accesstoken = AccessTokenProxy.objects.generate_new_token_for_user(
+            user, application=application, scope='r:profile')
 
         # can exchange valid authcode for accesstoken
         authcode = authcode_for_accesstoken(accesstoken)
@@ -184,7 +184,7 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
 
     def test_can_use_authcode_exchange_refresh(self):
         user = self.setup_user(authenticate=False)
-        issuer = self.setup_issuer(owner=user)
+        self.setup_issuer(owner=user)
         application = Application.objects.create(
             client_id='testing-authcode',
             client_type=Application.CLIENT_CONFIDENTIAL,
@@ -232,7 +232,7 @@ class OAuth2TokenTests(SetupIssuerHelper, BadgrTestCase):
                     'description': "Recognizes slimy learners with a penchant for lettuce",
                     'image': self._base64_data_uri_encode(badge_image, 'image/png'),
                     'criteriaNarrative': 'Eat lettuce. Grow big.'
-                }
+                    }
         response = self.client.post('/v2/badgeclasses', badgeclass_data)
         self.assertEqual(response.status_code, 401)
 

@@ -6,7 +6,6 @@ from time import sleep
 
 import dateutil.parser
 import json
-from mock import patch
 from openbadges_bakery import unbake
 import png
 import pytz
@@ -67,7 +66,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             self.assertEqual(response.status_code, 200)
 
             page = response.data
-            expected_page_count = min(total_assertion_count-number_seen, per_page)
+            expected_page_count = min(total_assertion_count - number_seen, per_page)
             self.assertEqual(len(page), expected_page_count)
             number_seen += len(page)
 
@@ -99,7 +98,8 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         test_assertion.rebake()
         assertion = BadgeInstance.objects.get(entity_id=test_assertion.entity_id)
         self.assertNotEqual(original_image_url, test_assertion.image_url(),
-                            "To ensure downstream caches don't have the old image saved, a new filename is used")
+                            "To ensure downstream caches don't have the old image saved, "
+                            "a new filename is used")
 
         v2_datastr = unbake(assertion.image)
         self.assertTrue(v2_datastr)
@@ -318,7 +318,8 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         image = instance.image
         image_data = json.loads(unbake(image))
 
-        self.assertEqual(image_data.get('evidence', {})[0].get('narrative'), v2_assertion_data['evidence'][0]['narrative'])
+        self.assertEqual(image_data.get('evidence', {})[0].get(
+            'narrative'), v2_assertion_data['evidence'][0]['narrative'])
 
     def test_can_update_assertion_issuer(self):
         test_user = self.setup_user(authenticate=True)
@@ -347,7 +348,8 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             }), content_type='application/json')
         self.assertEqual(response.status_code, 200)
 
-        response = self.client.get('/public/assertions/{}?expand=badge&expand=badge.issuer'.format(original_assertion['slug']))
+        response = self.client.get(
+            '/public/assertions/{}?expand=badge&expand=badge.issuer'.format(original_assertion['slug']))
         assertion_data = response.data
         self.assertEqual(assertion_data['badge']['issuer']['email'], email_two.email)
 
@@ -648,13 +650,13 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
 
         fetched_evidence_items = assertion.get('evidence_items')
         self.assertEqual(len(fetched_evidence_items), len(evidence_items))
-        for i in range(0,len(evidence_items)):
+        for i in range(0, len(evidence_items)):
             self.assertEqual(fetched_evidence_items[i].get('url'), evidence_items[i].get('url'))
             self.assertEqual(fetched_evidence_items[i].get('narrative'), evidence_items[i].get('narrative'))
 
         # ob1.0 evidence url also present
         self.assertIsNotNone(assertion.get('json'))
-        assertion_public_url = OriginSetting.HTTP+reverse('badgeinstance_json', kwargs={'entity_id': assertion_slug})
+        assertion_public_url = OriginSetting.HTTP + reverse('badgeinstance_json', kwargs={'entity_id': assertion_slug})
         self.assertEqual(assertion.get('json').get('evidence'), assertion_public_url)
 
     def test_v2_issue_with_evidence(self):
@@ -737,7 +739,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
 
         fetched_evidence_items = assertion.get('evidence_items')
         self.assertEqual(len(fetched_evidence_items), len(evidence_items))
-        for i in range(0,len(evidence_items)):
+        for i in range(0, len(evidence_items)):
             self.assertEqual(v2_json['evidence'][i].get('id'), evidence_items[i].get('url'))
             self.assertEqual(v2_json['evidence'][i].get('narrative'), evidence_items[i].get('narrative'))
             self.assertEqual(fetched_evidence_items[i].get('url'), evidence_items[i].get('url'))
@@ -745,7 +747,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
 
         # ob1.0 evidence url also present
         self.assertIsNotNone(assertion.get('json'))
-        assertion_public_url = OriginSetting.HTTP+reverse('badgeinstance_json', kwargs={'entity_id': assertion_slug})
+        assertion_public_url = OriginSetting.HTTP + reverse('badgeinstance_json', kwargs={'entity_id': assertion_slug})
         self.assertEqual(assertion.get('json').get('evidence'), assertion_public_url)
 
     def test_resized_png_image_baked_properly(self):
@@ -804,7 +806,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         test_issuer = self.setup_issuer(owner=test_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
 
-        non_editor_user = self.setup_user(authenticate=True)
+        self.setup_user(authenticate=True)
         assertion = {
             "email": "test2@example.com"
         }
@@ -861,7 +863,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             badge=test_badgeclass.entity_id,
         ), assertion)
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(len(mail.outbox), outbox_count+1)
+        self.assertEqual(len(mail.outbox), outbox_count + 1)
 
         # should not get notified of second assertion
         response = self.client.post('/v1/issuer/issuers/{issuer}/badges/{badge}/assertions'.format(
@@ -869,7 +871,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             badge=test_badgeclass.entity_id,
         ), assertion)
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(len(mail.outbox), outbox_count+1)
+        self.assertEqual(len(mail.outbox), outbox_count + 1)
 
     def test_authenticated_owner_list_assertions(self):
         test_user = self.setup_user(authenticate=True)
@@ -940,7 +942,6 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 1)
 
-
     def test_issuer_instance_list_assertions_with_revoked_and_expired(self):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
@@ -1002,7 +1003,7 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             issuer=test_issuer.entity_id,
             badge=test_badgeclass.entity_id,
             assertion=test_assertion.entity_id,
-        ), {'revocation_reason': revocation_reason })
+        ), {'revocation_reason': revocation_reason})
         self.assertEqual(response.status_code, 200)
 
         response = self.client.get('/public/assertions/{assertion}.json'.format(assertion=test_assertion.entity_id))
@@ -1099,8 +1100,8 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             issuer=test_issuer.entity_id,
             badge=test_badgeclass.entity_id,
         ))
-        badgeclass_data = response.data
-        self.assertEqual(test_badgeclass.badgeinstances.filter(revoked=False).count(), original_recipient_count+1)
+        response.data
+        self.assertEqual(test_badgeclass.badgeinstances.filter(revoked=False).count(), original_recipient_count + 1)
 
     def test_batch_assertions_throws_400(self):
         test_user = self.setup_user(authenticate=True)
@@ -1169,7 +1170,8 @@ class AssertionTests(SetupIssuerHelper, BadgrTestCase):
             badge=test_badgeclass.entity_id
         ), assertion_data, format='json')
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data['fieldErrors']['issuedOn'][0], 'Only issuedOn dates after the introduction of the Gregorian calendar are allowed.')
+        self.assertEqual(response.data['fieldErrors']['issuedOn'][0],
+                         'Only issuedOn dates after the introduction of the Gregorian calendar are allowed.')
 
     def test_batch_assertions_with_evidence(self):
         test_user = self.setup_user(authenticate=True)
@@ -1350,7 +1352,8 @@ class V2ApiAssertionTests(SetupIssuerHelper, BadgrTestCase):
         ), new_assertion_props, format='json')
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['fieldErrors']['recipient']['non_field_errors'][0], 'Enter a valid URL.')
-        # TODO this might be nicer if it were just a fieldError for recipient.identity or just was a non_field_error:[str] to begin with
+        # TODO this might be nicer if it were just a fieldError for recipient.identity
+        # or just was a non_field_error:[str] to begin with
 
     def test_v2_issue_by_badgeclassOpenBadgeId_permissions(self):
         test_user = self.setup_user(authenticate=True)
@@ -1444,7 +1447,7 @@ class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssue
 
         # retrieve a token for the issuer owner user
         response = self.client.post('/o/token', data=dict(
-            grant_type=application.authorization_grant_type.replace('-','_'),
+            grant_type=application.authorization_grant_type.replace('-', '_'),
             client_id=application.client_id,
             scope="rw:issuer",
             username=issuer_user.email,
@@ -1473,6 +1476,7 @@ class AssertionsChangedApplicationTests(SetupOAuth2ApplicationHelper, SetupIssue
         response = self.client.get('/v2/assertions/changed?since={}'.format(quote_plus(timestamp)))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['result']), 0)
+
 
 @override_settings(
     CELERY_ALWAYS_EAGER=True
@@ -1523,7 +1527,6 @@ class AssertionWithUserTests(SetupIssuerHelper, BadgrTestCase):
         award = BadgeInstance.objects.get(recipient_identifier=my_id.identifier)
         self.assertEqual(award.user, recipient)
 
-
     def test_verification_change_disowns_badge(self):
         recipient = self.setup_user(email='recipient@example.com', authenticate=False)
         badgeclass = self.setup_badgeclass(issuer=self.issuer)
@@ -1546,7 +1549,6 @@ class AssertionWithUserTests(SetupIssuerHelper, BadgrTestCase):
         email.save()
         award2 = badgeclass.issue(recipient_id=recipient.email)
         self.assertEqual(award2.user, None)
-
 
     def test_assertion_has_user_post_issue(self):
         recipient = self.setup_user(email='recipient@example.com', authenticate=False)
@@ -1624,7 +1626,7 @@ class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
-        existing_assertion = test_badgeclass.issue(
+        test_badgeclass.issue(
             'test3@example.com', expires_at=timezone.now() + timezone.timedelta(days=1)
         )
 
@@ -1643,7 +1645,7 @@ class AllowDuplicatesAPITests(SetupIssuerHelper, BadgrTestCase):
         test_user = self.setup_user(authenticate=True)
         test_issuer = self.setup_issuer(owner=test_user)
         test_badgeclass = self.setup_badgeclass(issuer=test_issuer)
-        existing_assertion = test_badgeclass.issue(
+        test_badgeclass.issue(
             'test3@example.com', expires_at=timezone.now() - timezone.timedelta(days=1)
         )
 

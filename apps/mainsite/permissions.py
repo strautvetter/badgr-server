@@ -1,8 +1,6 @@
 import oauth2_provider
 from rest_framework import permissions
 
-from badgeuser.models import CachedEmailAddress
-
 
 class IsOwner(permissions.BasePermission):
     """
@@ -17,6 +15,7 @@ class IsRequestUser(permissions.BasePermission):
     """
     Allows users to be able to act on their own profile, but not on others.
     """
+
     def has_object_permission(self, request, view, obj):
         return obj == request.user
 

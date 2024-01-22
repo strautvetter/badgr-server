@@ -1,4 +1,3 @@
-from apps import badgrlog
 import os
 import pytz
 import uuid
@@ -13,21 +12,21 @@ from django.core.validators import EmailValidator, URLValidator
 from django.db.models import Q
 from django.utils.html import strip_tags
 from django.utils import timezone
-from django.conf import settings
 from rest_framework import serializers
 
 from . import utils
 from badgeuser.serializers_v1 import BadgeUserProfileSerializerV1, BadgeUserIdentifierFieldV1
 from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
-from mainsite.serializers import DateTimeWithUtcZAtEndField, HumanReadableBooleanField, StripTagsCharField, MarkdownCharField, \
-    OriginalJsonSerializerMixin
+from mainsite.serializers import DateTimeWithUtcZAtEndField, HumanReadableBooleanField, \
+        StripTagsCharField, MarkdownCharField, OriginalJsonSerializerMixin
 from mainsite.utils import OriginSetting
-from mainsite.exceptions import BadgrValidationError, BadgrValidationFieldError
 from mainsite.validators import ChoicesValidator, BadgeExtensionValidator, PositiveIntegerValidator, TelephoneValidator
-from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance, BadgeClassExtension, RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL
+from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance, BadgeClassExtension, \
+        RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL
 
 logger = logging.getLogger(__name__)
+
 
 class ExtensionsSaverMixin(object):
     def remove_extensions(self, instance, extensions_to_remove):
@@ -60,6 +59,7 @@ class ExtensionsSaverMixin(object):
             self.remove_extensions(instance, remove_these_extensions)
             self.update_extensions(instance, update_these_extensions, extension_items)
             self.add_extensions(instance, add_these_extensions, extension_items)
+
 
 class CachedListSerializer(serializers.ListSerializer):
     def to_representation(self, data):
@@ -106,7 +106,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
     zip = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     city = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     country = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
-   
+
     lat = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
     lon = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
 
@@ -125,7 +125,8 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
 
         if not user.is_email_verified(potential_email):
             raise serializers.ValidationError(
-                "Issuer email must be one of your verified addresses. Add this email to your profile and try again.")
+                "Issuer email must be one of your verified addresses. "
+                "Add this email to your profile and try again.")
 
         new_issuer = Issuer(**validated_data)
 
@@ -135,7 +136,6 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
         new_issuer.zip = validated_data.get('zip')
         new_issuer.city = validated_data.get('city')
         new_issuer.country = validated_data.get('country')
-
 
         # set badgrapp
         new_issuer.badgrapp = BadgrApp.objects.get_current(self.context.get('request', None))
@@ -154,7 +154,7 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
         instance.email = validated_data.get('email')
         instance.description = validated_data.get('description')
         instance.url = validated_data.get('url')
-        
+
         instance.category = validated_data.get('category')
         instance.street = validated_data.get('street')
         instance.streetnumber = validated_data.get('streetnumber')
@@ -174,7 +174,8 @@ class IssuerSerializerV1(OriginalJsonSerializerMixin, serializers.Serializer):
         representation['json'] = obj.get_json(obi_version='1_1', use_canonical_id=True)
 
         if self.context.get('embed_badgeclasses', False):
-            representation['badgeclasses'] = BadgeClassSerializerV1(obj.badgeclasses.all(), many=True, context=self.context).data
+            representation['badgeclasses'] = BadgeClassSerializerV1(
+                obj.badgeclasses.all(), many=True, context=self.context).data
 
         representation['badgeClassCount'] = len(obj.cached_badgeclasses())
         representation['recipientGroupCount'] = 0
@@ -200,7 +201,8 @@ class IssuerRoleActionSerializerV1(serializers.Serializer):
         identifier_count = len(list(filter(None.__ne__, identifiers)))
         if identifier_count > 1:
             raise serializers.ValidationError(
-                'Please provided only one of the following: a username, email address, url, or telephone recipient identifier.'
+                'Please provided only one of the following: a username, email address, '
+                'url, or telephone recipient identifier.'
             )
         return attrs
 
@@ -218,7 +220,8 @@ class AlignmentItemSerializerV1(serializers.Serializer):
 
 class BadgeClassExpirationSerializerV1(serializers.Serializer):
     amount = serializers.IntegerField(source='expires_amount', allow_null=True, validators=[PositiveIntegerValidator()])
-    duration = serializers.ChoiceField(source='expires_duration', allow_null=True, choices=BadgeClass.EXPIRES_DURATION_CHOICES)
+    duration = serializers.ChoiceField(source='expires_duration', allow_null=True,
+                                       choices=BadgeClass.EXPIRES_DURATION_CHOICES)
 
 
 class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, serializers.Serializer):
@@ -240,7 +243,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, 
     extensions = serializers.DictField(source='extension_items', required=False, validators=[BadgeExtensionValidator()])
 
     expires = BadgeClassExpirationSerializerV1(source='*', required=False, allow_null=True)
-    
+
     source_url = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
 
     class Meta:
@@ -256,7 +259,8 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, 
     def to_representation(self, instance):
         representation = super(BadgeClassSerializerV1, self).to_representation(instance)
         representation['issuerName'] = instance.cached_issuer.name
-        representation['issuer'] = OriginSetting.HTTP+reverse('issuer_json', kwargs={'entity_id': instance.cached_issuer.entity_id})
+        representation['issuer'] = OriginSetting.HTTP + \
+            reverse('issuer_json', kwargs={'entity_id': instance.cached_issuer.entity_id})
         representation['json'] = instance.get_json(obi_version='1_1', use_canonical_id=True)
         return representation
 
@@ -303,7 +307,6 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, 
                                             badgeclass_id=instance.pk)
             extension.save()
 
-
     def update(self, instance, validated_data):
         logger.info("UPDATE BADGECLASS")
         logger.debug(validated_data)
@@ -321,7 +324,7 @@ class BadgeClassSerializerV1(OriginalJsonSerializerMixin, ExtensionsSaverMixin, 
 
         # Assure both criteria_url and criteria_text will not be empty
         if 'criteria_url' in validated_data or 'criteria_text' in validated_data:
-            end_criteria_url = validated_data['criteria_url'] if  'criteria_url' in validated_data \
+            end_criteria_url = validated_data['criteria_url'] if 'criteria_url' in validated_data \
                 else instance.criteria_url
             end_criteria_text = validated_data['criteria_text'] if 'criteria_text' in validated_data \
                 else instance.criteria_text
@@ -418,7 +421,8 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
     revoked = HumanReadableBooleanField(read_only=True)
     revocation_reason = serializers.CharField(read_only=True)
 
-    expires = DateTimeWithUtcZAtEndField(source='expires_at', required=False, allow_null=True, default_timezone=pytz.utc)
+    expires = DateTimeWithUtcZAtEndField(source='expires_at', required=False,
+                                         allow_null=True, default_timezone=pytz.utc)
 
     create_notification = HumanReadableBooleanField(write_only=True, required=False, default=False)
     allow_duplicate_awards = serializers.BooleanField(write_only=True, required=False, default=True)
@@ -479,13 +483,17 @@ class BadgeInstanceSerializerV1(OriginalJsonSerializerMixin, serializers.Seriali
         if self.context.get('include_issuer', False):
             representation['issuer'] = IssuerSerializerV1(instance.cached_badgeclass.cached_issuer).data
         else:
-            representation['issuer'] = OriginSetting.HTTP+reverse('issuer_json', kwargs={'entity_id': instance.cached_issuer.entity_id})
+            representation['issuer'] = OriginSetting.HTTP + \
+                reverse('issuer_json', kwargs={'entity_id': instance.cached_issuer.entity_id})
         if self.context.get('include_badge_class', False):
-            representation['badge_class'] = BadgeClassSerializerV1(instance.cached_badgeclass, context=self.context).data
+            representation['badge_class'] = BadgeClassSerializerV1(
+                instance.cached_badgeclass, context=self.context).data
         else:
-            representation['badge_class'] = OriginSetting.HTTP+reverse('badgeclass_json', kwargs={'entity_id': instance.cached_badgeclass.entity_id})
+            representation['badge_class'] = OriginSetting.HTTP + \
+                reverse('badgeclass_json', kwargs={'entity_id': instance.cached_badgeclass.entity_id})
 
-        representation['public_url'] = OriginSetting.HTTP+reverse('badgeinstance_json', kwargs={'entity_id': instance.entity_id})
+        representation['public_url'] = OriginSetting.HTTP + \
+            reverse('badgeinstance_json', kwargs={'entity_id': instance.entity_id})
 
         return representation
 

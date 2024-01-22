@@ -6,7 +6,6 @@ from contextlib import closing
 from urllib.parse import urlparse, parse_qs
 
 from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
 from django.utils.timezone import datetime
 from django.shortcuts import reverse
 from django.test import override_settings
@@ -40,7 +39,8 @@ class SAML2Tests(BadgrTestCase):
     def setUp(self):
         super(SAML2Tests, self).setUp()
         self.test_files_path = os.path.join(TOP_DIR, 'apps', 'badgrsocialauth', 'testfiles')
-        self.idp_metadata_for_sp_config_path = os.path.join(self.test_files_path, 'idp-metadata-for-saml2configuration.xml')
+        self.idp_metadata_for_sp_config_path = os.path.join(
+            self.test_files_path, 'idp-metadata-for-saml2configuration.xml')
 
         with open(self.idp_metadata_for_sp_config_path, 'r') as f:
             metadata_xml = f.read()
@@ -78,15 +78,14 @@ class SAML2Tests(BadgrTestCase):
 
         return self.client.get(url, HTTP_REFERER=badgr_app.ui_login_redirect)
 
-
     def test_signed_authn_request_option_creates_signed_metadata(self):
         self._skip_if_xmlsec_binary_missing()
 
         self.config.use_signed_authn_request = True
         self.config.save()
         with override_settings(
-            SAML_KEY_FILE=self.ipd_key_path,
-            SAML_CERT_FILE=self.ipd_cert_path):
+                SAML_KEY_FILE=self.ipd_key_path,
+                SAML_CERT_FILE=self.ipd_cert_path):
             saml_client, config = saml2_client_for(self.config)
             self.assertTrue(saml_client.authn_requests_signed)
             self.assertNotEqual(saml_client.sec.sec_backend, None)
@@ -96,8 +95,8 @@ class SAML2Tests(BadgrTestCase):
         self.config.use_signed_authn_request = True
         self.config.save()
         with override_settings(
-            SAML_KEY_FILE=self.ipd_key_path,
-            SAML_CERT_FILE=self.ipd_cert_path):
+                SAML_KEY_FILE=self.ipd_key_path,
+                SAML_CERT_FILE=self.ipd_cert_path):
             authn_request = self.config
             url = '/account/sociallogin?provider=' + authn_request.slug
             redirect_url = '/account/saml2/' + authn_request.slug + '/'
@@ -111,12 +110,15 @@ class SAML2Tests(BadgrTestCase):
             self.assertEqual(response.status_code, 200)
             # changing attribute location of element md:SingleSignOnService necessitates updating this value
             self.assertIsNot(
-                response.content.find(b'<form action="https://example.com/saml2/idp/SSOService.php" method="post">'), -1)
+                response.content.find(
+                    b'<form action="https://example.com/saml2/idp/SSOService.php" method="post">'),
+                -1)
             self.assertIsNot(
                 response.content.find(b'<input type="hidden" name="SAMLRequest" value="'), -1)
 
     def test_create_saml2_client(self):
-        Saml2Configuration.objects.create(metadata_conf_url="http://example.com", cached_metadata="<xml></xml>",  slug="saml2.test2")
+        Saml2Configuration.objects.create(metadata_conf_url="http://example.com",
+                                          cached_metadata="<xml></xml>", slug="saml2.test2")
         client = saml2_client_for("saml2.test2")
         self.assertNotEqual(client, None)
 
@@ -139,7 +141,7 @@ class SAML2Tests(BadgrTestCase):
         cached_email.verified = True
         cached_email.save()
         Saml2Account.objects.create(config=self.config, user=new_user, uuid=email)
-        badgr_app = BadgrApp.objects.create(ui_login_redirect="example.com", cors='example.com')
+        BadgrApp.objects.create(ui_login_redirect="example.com", cors='example.com')
         resp = auto_provision(None, [email], first_name, last_name, self.config)
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
@@ -150,7 +152,6 @@ class SAML2Tests(BadgrTestCase):
         email = "test456@example.com"
         first_name = "firsty"
         last_name = "lastington"
-        badgr_app = self.badgr_app
         resp = auto_provision(None, [email], first_name, last_name, self.config)
         self.assertEqual(resp.status_code, 302)
         resp = self.client.get(resp.url)
@@ -240,10 +241,12 @@ class SAML2Tests(BadgrTestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authError=Could+not", resp.url)
         self.assertIn(self.config.slug, resp.url)
-        self.assertEqual(saml_account_count, Saml2Account.objects.count(), "A Saml2Account must not have been created.")
+        self.assertEqual(saml_account_count, Saml2Account.objects.count(),
+                "A Saml2Account must not have been created.")
 
         resp = self.client.get(resp.url)
-        self.assertIn(self.config.slug, resp.url, "Query params are included in the response all the way back to the UI")
+        self.assertIn(self.config.slug, resp.url,
+                "Query params are included in the response all the way back to the UI")
 
     def test_add_samlaccount_to_existing_user(self):
         # email exists, but is verified
@@ -288,7 +291,7 @@ class SAML2Tests(BadgrTestCase):
         resp = self.client.get(resp.url)
         self.assertEqual(resp.status_code, 302)
         self.assertIn("authToken", resp.url)
-        account = Saml2Account.objects.get(user=test_user)
+        Saml2Account.objects.get(user=test_user)
 
     def get_idp_config(self, meta=None):
         metadata_sp_1 = os.path.join(self.test_files_path, 'metadata_sp_1.xml')
@@ -499,7 +502,7 @@ class SAML2Tests(BadgrTestCase):
         self.config.save()
 
         email = 'exampleuser@example.com'
-        t_user = self.setup_user(
+        self.setup_user(
             email=email,
             token_scope='rw:profile rw:issuer rw:backpack'
         )
@@ -672,8 +675,7 @@ class SamlServer(Server):
                 encrypt_cert_advice=encrypt_cert_advice,
                 encrypt_cert_assertion=encrypt_cert_assertion,
                 encrypt_assertion=encrypt_assertion,
-                encrypt_assertion_self_contained
-                =encrypt_assertion_self_contained,
+                encrypt_assertion_self_contained=encrypt_assertion_self_contained,
                 encrypted_advice_attributes=encrypted_advice_attributes,
                 pefim=pefim, **kwargs)
 

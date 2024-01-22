@@ -12,14 +12,17 @@ from rest_framework import serializers
 from badgeuser.models import BadgeUser
 from badgeuser.serializers_v2 import BadgeUserEmailSerializerV2
 from entity.serializers import DetailSerializerV2, EntityRelatedFieldV2, BaseSerializerV2
-from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance, RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL, RECIPIENT_TYPE_TELEPHONE
+from issuer.models import Issuer, IssuerStaff, BadgeClass, BadgeInstance, \
+        RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL, RECIPIENT_TYPE_TELEPHONE
 from issuer.permissions import IsEditor
 from issuer.utils import generate_sha256_hashstring, request_authenticated_with_server_admin_token
 from mainsite.drf_fields import ValidImageField
 from mainsite.models import BadgrApp
-from mainsite.serializers import (CachedUrlHyperlinkedRelatedField, DateTimeWithUtcZAtEndField, StripTagsCharField, MarkdownCharField,
-                                  HumanReadableBooleanField, OriginalJsonSerializerMixin)
-from mainsite.validators import ChoicesValidator, TelephoneValidator, BadgeExtensionValidator, PositiveIntegerValidator
+from mainsite.serializers import CachedUrlHyperlinkedRelatedField, \
+        DateTimeWithUtcZAtEndField, StripTagsCharField, MarkdownCharField, \
+        HumanReadableBooleanField, OriginalJsonSerializerMixin
+from mainsite.validators import ChoicesValidator, TelephoneValidator, \
+        BadgeExtensionValidator, PositiveIntegerValidator
 
 
 class IssuerAccessTokenSerializerV2(BaseSerializerV2):
@@ -179,7 +182,8 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
             validated_data['badgrapp'] = BadgrApp.objects.get_current(request)
 
         # Server admins are exempt from email verification requirement. They will enforce it themselves.
-        if not request_authenticated_with_server_admin_token(request) and not validated_data['created_by'].is_email_verified(potential_email):
+        if (not request_authenticated_with_server_admin_token(request)
+                and not validated_data['created_by'].is_email_verified(potential_email)):
             raise serializers.ValidationError(
                 "Issuer email must be one of your verified addresses. Add this email to your profile and try again.")
 
@@ -211,7 +215,8 @@ class IssuerSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
 class AlignmentItemSerializerV2(BaseSerializerV2, OriginalJsonSerializerMixin):
     targetName = StripTagsCharField(source='target_name')
     targetUrl = serializers.URLField(source='target_url')
-    targetDescription = StripTagsCharField(source='target_description', required=False, allow_null=True, allow_blank=True)
+    targetDescription = StripTagsCharField(source='target_description',
+                                           required=False, allow_null=True, allow_blank=True)
     targetFramework = StripTagsCharField(source='target_framework', required=False, allow_null=True, allow_blank=True)
     targetCode = StripTagsCharField(source='target_code', required=False, allow_null=True, allow_blank=True)
 
@@ -224,7 +229,8 @@ class AlignmentItemSerializerV2(BaseSerializerV2, OriginalJsonSerializerMixin):
 
 class BadgeClassExpirationSerializerV2(serializers.Serializer):
     amount = serializers.IntegerField(source='expires_amount', allow_null=True, validators=[PositiveIntegerValidator()])
-    duration = serializers.ChoiceField(source='expires_duration', allow_null=True, choices=BadgeClass.EXPIRES_DURATION_CHOICES)
+    duration = serializers.ChoiceField(source='expires_duration', allow_null=True,
+                                       choices=BadgeClass.EXPIRES_DURATION_CHOICES)
 
     class Meta:
         apispec_definition = ('BadgeClassExpiration', {
@@ -244,7 +250,8 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
     image = ValidImageField(required=False, use_public=True, source='*')
     description = StripTagsCharField(max_length=16384, required=True, convert_null=True)
 
-    criteriaUrl = StripTagsCharField(source='criteria_url', required=False, allow_null=True, validators=[URLValidator()])
+    criteriaUrl = StripTagsCharField(source='criteria_url', required=False,
+                                     allow_null=True, validators=[URLValidator()])
     criteriaNarrative = MarkdownCharField(source='criteria_text', required=False, allow_null=True)
 
     alignments = AlignmentItemSerializerV2(source='alignment_items', many=True, required=False)
@@ -317,7 +324,8 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
                 ('criteriaUrl', {
                     'type': "string",
                     'format': "url",
-                    'description': "External URL that describes in a human-readable format the criteria for the BadgeClass",
+                    'description': ("External URL that describes in a human-readable "
+                        "format the criteria for the BadgeClass"),
                     'required': False,
                 }),
                 ('criteriaNarrative', {
@@ -395,7 +403,7 @@ class BadgeClassSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin):
         else:
             # issuer is required on create
             raise serializers.ValidationError({"issuer": "This field is required"})
-        if 'criteria_url' not in validated_data  and 'criteria_text' not in validated_data:
+        if 'criteria_url' not in validated_data and 'criteria_text' not in validated_data:
             raise serializers.ValidationError("A criteria_url or criteria_test is required.")
 
         if not IsEditor().has_object_permission(self.context.get('request'), None, validated_data['issuer']):
@@ -526,7 +534,8 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
     revocationReason = serializers.CharField(source='revocation_reason', read_only=True)
     acceptance = serializers.CharField(read_only=True)
 
-    expires = DateTimeWithUtcZAtEndField(source='expires_at', required=False, allow_null=True, default_timezone=pytz.utc)
+    expires = DateTimeWithUtcZAtEndField(source='expires_at', required=False,
+                                         allow_null=True, default_timezone=pytz.utc)
 
     notify = HumanReadableBooleanField(write_only=True, required=False, default=False)
     allowDuplicateAwards = serializers.BooleanField(write_only=True, required=False, default=True)
@@ -647,7 +656,8 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
         if value > timezone.now():
             raise serializers.ValidationError("Only issuedOn dates in the past are acceptable.")
         if value.year < 1583:
-            raise serializers.ValidationError("Only issuedOn dates after the introduction of the Gregorian calendar are allowed.")
+            raise serializers.ValidationError(
+                "Only issuedOn dates after the introduction of the Gregorian calendar are allowed.")
         return value
 
     def update(self, instance, validated_data):
@@ -685,7 +695,10 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
             badge_instance_properties.append('badgeclass')
 
         if sum([el in badgeclass_identifiers for el in badge_instance_properties]) > 1:
-            raise serializers.ValidationError('Multiple badge class identifiers. Exactly one of the following badge class identifiers are allowed: badgeclass, badgeclassName, or badgeclassOpenBadgeId')
+            raise serializers.ValidationError(
+                'Multiple badge class identifiers. '
+                'Exactly one of the following badge class identifiers are allowed: '
+                'badgeclass, badgeclassName, or badgeclassOpenBadgeId')
 
         if request and request.method != 'PUT':
             # recipient and badgeclass are only required on create, ignored on update
@@ -709,7 +722,8 @@ class BadgeInstanceSerializerV2(DetailSerializerV2, OriginalJsonSerializerMixin)
                 elif len_matches == 0:
                     raise serializers.ValidationError("No matching BadgeClass found with name {}".format(name))
                 else:
-                    raise serializers.ValidationError("Could not award; {} BadgeClasses with name {}".format(len_matches, name))
+                    raise serializers.ValidationError(
+                        "Could not award; {} BadgeClasses with name {}".format(len_matches, name))
             else:
                 raise serializers.ValidationError({"badgeclass": ["This field is required"]})
 

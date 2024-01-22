@@ -18,7 +18,6 @@ from django.utils import timezone
 from django.utils.http import urlencode
 
 from socialauth.providers.log_configuration import debug_requests
-from .provider import IdTokenProvider
 
 
 logger = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ class IdTokenOAuth2Adapter(OAuth2Adapter):
             self.jwks_url = app_settings.PROVIDERS[self.provider_id]['jwks_url']
             self.intended_aud = app_settings.PROVIDERS[self.provider_id].get('aud', None)
             self.response_type = app_settings.PROVIDERS[self.provider_id].get('response_type', 'code')
-        except KeyError as e:
+        except KeyError:
             raise ImproperlyConfigured(self.provider_id)
 
     def get_public_key(self, kid=None):
@@ -172,6 +171,8 @@ class IdTokenOAuth2CallbackView(OAuth2CallbackView):
 
 oauth2_login = OAuth2LoginView.adapter_view(IdTokenOAuth2Adapter)
 base_oauth2_callback = IdTokenOAuth2CallbackView.adapter_view(IdTokenOAuth2Adapter)
+
+
 def oauth2_callback(*args, **kwargs):
     with debug_requests():
         return base_oauth2_callback(*args, **kwargs)

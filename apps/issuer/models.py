@@ -1,17 +1,17 @@
 import io
 import datetime
-import urllib.request, urllib.parse, urllib.error
+import urllib.request
+import urllib.parse
+import urllib.error
 
 import dateutil
 import re
 import uuid
 from collections import OrderedDict
-from itertools import chain
 
 import cachemodel
 import os
 from allauth.account.adapter import get_adapter
-from cachemodel import CACHE_FOREVER_TIMEOUT
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -27,7 +27,6 @@ from json import dumps as json_dumps
 from jsonfield import JSONField
 from openbadges_bakery import bake
 from django.utils import timezone
-from django.core.cache import cache
 
 import badgrlog
 from entity.models import BaseVersionedEntity
@@ -97,7 +96,7 @@ class OriginalJsonMixin(models.Model):
         if self.original_json:
             try:
                 return json_loads(self.original_json)
-            except (TypeError, ValueError) as e:
+            except (TypeError, ValueError):
                 pass
 
     def get_filtered_json(self, excluded_fields=()):
@@ -192,13 +191,12 @@ class Issuer(ResizeUploadedImage,
 
     # slug has been deprecated for now, but preserve existing values
     slug = models.CharField(max_length=255, db_index=True, blank=True, null=True, default=None)
-    #slug = AutoSlugField(max_length=255, populate_from='name', unique=True, blank=False, editable=True)
+    # slug = AutoSlugField(max_length=255, populate_from='name', unique=True, blank=False, editable=True)
 
     badgrapp = models.ForeignKey('mainsite.BadgrApp', blank=True, null=True, default=None, on_delete=models.SET_NULL)
 
     name = models.CharField(max_length=1024)
     image = models.FileField(upload_to='uploads/issuers', blank=True, null=True)
-    image_preview = models.FileField(upload_to='uploads/issuers', blank=True, null=True)
     description = models.TextField(blank=True, null=True, default=None)
     url = models.CharField(max_length=254, blank=True, null=True, default=None)
     email = models.CharField(max_length=254, blank=True, null=True, default=None)
@@ -208,16 +206,16 @@ class Issuer(ResizeUploadedImage,
 
     objects = IssuerManager()
     cached = SlugOrJsonIdCacheModelManager(slug_kwarg_name='entity_id', slug_field_name='entity_id')
-    
+
     category = models.CharField(max_length=255, null=False, default='n/a')
 
-    #address fields
+    # address fields
     street = models.CharField(max_length=255, null=True, blank=True)
     streetnumber = models.CharField(max_length=255, null=True, blank=True)
     zip = models.CharField(max_length=255, null=True, blank=True)
     city = models.CharField(max_length=255, null=True, blank=True)
     country = models.CharField(max_length=255, null=True, blank=True)
-    
+
     lat = models.FloatField(null=True, blank=True)
     lon = models.FloatField(null=True, blank=True)
 
@@ -273,30 +271,31 @@ class Issuer(ResizeUploadedImage,
 
     # override init method to save original address
     def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.__original_address = { 'street': self.street, 'streetnumber': self.streetnumber, 'city': self.city, 'zip': self.zip, 'country': self.country }
+        super().__init__(*args, **kwargs)
+        self.__original_address = {'street': self.street, 'streetnumber': self.streetnumber,
+            'city': self.city, 'zip': self.zip, 'country': self.country}
 
     def save(self, *args, **kwargs):
         if not self.pk:
             self.notify_admins(self)
-       
-        #geocoding if address in model changed
+
+        # geocoding if address in model changed
         if self.__original_address:
-            if (self.street != self.__original_address['street'] or
-                    self.streetnumber != self.__original_address['streetnumber'] or
-                    self.city != self.__original_address['city'] or
-                    self.zip != self.__original_address['zip'] or
-                    self.country != self.__original_address['country']):
-                addr_string = (self.street if self.street != None else '') + " "
-                + (str(self.streetnumber) if self.streetnumber != None else '') + " "
-                + (str(self.zip) if self.zip != None else '')+ " "
-                + (str(self.city) if self.city != None else '') + " Deutschland"
+            if (self.street != self.__original_address['street']
+                    or self.streetnumber != self.__original_address['streetnumber']
+                    or self.city != self.__original_address['city']
+                    or self.zip != self.__original_address['zip']
+                    or self.country != self.__original_address['country']):
+                addr_string = (self.street if self.street is not None else '') + " "
+                + (str(self.streetnumber) if self.streetnumber is not None else '') + " "
+                + (str(self.zip) if self.zip is not None else '') + " "
+                + (str(self.city) if self.city is not None else '') + " Deutschland"
                 nom = Nominatim(user_agent="myBadges")
                 geoloc = nom.geocode(addr_string)
                 if geoloc:
                     self.lon = geoloc.longitude
                     self.lat = geoloc.latitude
-        
+
         ret = super(Issuer, self).save(*args, **kwargs)
 
         # The user who created the issuer should always be an owner
@@ -316,26 +315,25 @@ class Issuer(ResizeUploadedImage,
         """
 
         # If the creator is already the owner, nothing is to do
-        if self.staff.filter(issuerstaff__role=IssuerStaff.ROLE_OWNER, issuerstaff__user = self.created_by):
+        if self.staff.filter(issuerstaff__role=IssuerStaff.ROLE_OWNER, issuerstaff__user=self.created_by):
             return
         # If I don't have a creator, I can't do anything about it
         if not self.created_by_id:
             return
         # If there already is an IssuerStaff entry I have to edit it
-        if IssuerStaff.objects.filter(user = self.created_by, issuer = self).exists():
-            issuerStaff = IssuerStaff.objects.get(user = self.created_by, issuer = self)
+        if IssuerStaff.objects.filter(user=self.created_by, issuer=self).exists():
+            issuerStaff = IssuerStaff.objects.get(user=self.created_by, issuer=self)
             issuerStaff.role = IssuerStaff.ROLE_OWNER
             issuerStaff.save()
         else:
             IssuerStaff.objects.create(issuer=self, user=self.created_by, role=IssuerStaff.ROLE_OWNER)
-
 
     def get_absolute_url(self):
         return reverse('issuer_json', kwargs={'entity_id': self.entity_id})
 
     @property
     def public_url(self):
-        return OriginSetting.HTTP+self.get_absolute_url()
+        return OriginSetting.HTTP + self.get_absolute_url()
 
     def image_url(self, public=False):
         if bool(self.image):
@@ -454,7 +452,7 @@ class Issuer(ResizeUploadedImage,
         if include_extra:
             extra = self.get_filtered_json()
             if extra is not None:
-                for k,v in list(extra.items()):
+                for k, v in list(extra.items()):
                     if k not in json:
                         json[k] = v
 
@@ -464,16 +462,14 @@ class Issuer(ResizeUploadedImage,
     def json(self):
         return self.get_json()
 
-    def get_filtered_json(self, excluded_fields=('@context', 'id', 'type', 'name', 'url', 'description', 'image', 'email')):
+    def get_filtered_json(self, excluded_fields=('@context', 'id', 'type', 'name',
+            'url', 'description', 'image', 'email')):
         return super(Issuer, self).get_filtered_json(excluded_fields=excluded_fields)
 
     @property
     def cached_badgrapp(self):
         id = self.badgrapp_id if self.badgrapp_id else None
         return BadgrApp.objects.get_by_id_or_default(badgrapp_id=id)
-
-    def has_nonrevoked_assertions(self):
-        return self.badgeinstance_set.filter(revoked=False).exists()
 
     def notify_admins(self, badgr_app=None, renotify=False):
         """
@@ -506,13 +502,11 @@ class Issuer(ResizeUploadedImage,
             # 'badgr_app': badgr_app
         }
 
-
         template_name = 'issuer/email/notify_admins'
 
         adapter = get_adapter()
         for user in users:
             adapter.send_mail(template_name, user.email, context=email_context)
-            
 
 
 class IssuerStaff(cachemodel.CacheModel):
@@ -597,7 +591,7 @@ class BadgeClass(ResizeUploadedImage,
 
     # slug has been deprecated for now, but preserve existing values
     slug = models.CharField(max_length=255, db_index=True, blank=True, null=True, default=None)
-    #slug = AutoSlugField(max_length=255, populate_from='name', unique=True, blank=False, editable=True)
+    # slug = AutoSlugField(max_length=255, populate_from='name', unique=True, blank=False, editable=True)
 
     name = models.CharField(max_length=255)
     image = models.FileField(upload_to='uploads/badges', blank=True)
@@ -608,7 +602,8 @@ class BadgeClass(ResizeUploadedImage,
     criteria_text = models.TextField(blank=True, null=True)
 
     expires_amount = models.IntegerField(blank=True, null=True, default=None)
-    expires_duration = models.CharField(max_length=254, choices=EXPIRES_DURATION_CHOICES, blank=True, null=True, default=None)
+    expires_duration = models.CharField(max_length=254, choices=EXPIRES_DURATION_CHOICES,
+                                        blank=True, null=True, default=None)
 
     old_json = JSONField()
 
@@ -646,10 +641,9 @@ class BadgeClass(ResizeUploadedImage,
     def get_absolute_url(self):
         return reverse('badgeclass_json', kwargs={'entity_id': self.entity_id})
 
-
     @property
     def public_url(self):
-        return OriginSetting.HTTP+self.get_absolute_url()
+        return OriginSetting.HTTP + self.get_absolute_url()
 
     @property
     def jsonld_id(self):
@@ -664,7 +658,7 @@ class BadgeClass(ResizeUploadedImage,
     def get_criteria_url(self):
         if self.criteria_url:
             return self.criteria_url
-        return OriginSetting.HTTP+reverse('badgeclass_criteria', kwargs={'entity_id': self.entity_id})
+        return OriginSetting.HTTP + reverse('badgeclass_criteria', kwargs={'entity_id': self.entity_id})
 
     @property
     def description_nonnull(self):
@@ -686,7 +680,8 @@ class BadgeClass(ResizeUploadedImage,
         return self.badgeinstances.filter(revoked=False).exists()
 
     """
-    Included for legacy purposes. It is inefficient to routinely call this for badge classes with large numbers of assertions.
+    Included for legacy purposes. It is inefficient to routinely call this for
+    badge classes with large numbers of assertions.
     """
     @property
     def v1_api_recipient_count(self):
@@ -704,7 +699,7 @@ class BadgeClass(ResizeUploadedImage,
     def alignment_items(self, value):
         if value is None:
             value = []
-        keys = ['target_name','target_url','target_description','target_framework', 'target_code']
+        keys = ['target_name', 'target_url', 'target_description', 'target_framework', 'target_code']
 
         def _identity(align):
             """build a unique identity from alignment json"""
@@ -764,7 +759,9 @@ class BadgeClass(ResizeUploadedImage,
     def get_extensions_manager(self):
         return self.badgeclassextension_set
 
-    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False, created_by=None, allow_uppercase=False, badgr_app=None, recipient_type=RECIPIENT_TYPE_EMAIL, **kwargs):
+    def issue(self, recipient_id=None, evidence=None, narrative=None, notify=False,
+            created_by=None, allow_uppercase=False, badgr_app=None,
+            recipient_type=RECIPIENT_TYPE_EMAIL, **kwargs):
         return BadgeInstance.objects.create(
             badgeclass=self, recipient_identifier=recipient_id, recipient_type=recipient_type,
             narrative=narrative, evidence=evidence,
@@ -783,8 +780,6 @@ class BadgeClass(ResizeUploadedImage,
         else:
             return getattr(settings, 'HTTP_ORIGIN') + default_storage.url(self.image.name)
 
-
-
     def get_json(self, obi_version=CURRENT_OBI_VERSION, include_extra=True, use_canonical_id=False):
         obi_version, context_iri = get_obi_context(obi_version)
         json = OrderedDict({'@context': context_iri})
@@ -793,7 +788,8 @@ class BadgeClass(ResizeUploadedImage,
             id=self.jsonld_id if use_canonical_id else add_obi_version_ifneeded(self.jsonld_id, obi_version),
             name=self.name,
             description=self.description_nonnull,
-            issuer=self.cached_issuer.jsonld_id if use_canonical_id else add_obi_version_ifneeded(self.cached_issuer.jsonld_id, obi_version),
+            issuer=self.cached_issuer.jsonld_id if use_canonical_id else add_obi_version_ifneeded(
+                self.cached_issuer.jsonld_id, obi_version),
         ))
 
         # image
@@ -829,7 +825,7 @@ class BadgeClass(ResizeUploadedImage,
 
         # alignment / tags
         if obi_version == '2_0':
-            json['alignment'] = [ a.get_json(obi_version=obi_version) for a in self.cached_alignments() ]
+            json['alignment'] = [a.get_json(obi_version=obi_version) for a in self.cached_alignments()]
             json['tags'] = list(t.name for t in self.cached_tags())
 
         # extensions
@@ -841,7 +837,7 @@ class BadgeClass(ResizeUploadedImage,
         if include_extra:
             extra = self.get_filtered_json()
             if extra is not None:
-                for k,v in list(extra.items()):
+                for k, v in list(extra.items()):
                     if k not in json:
                         json[k] = v
 
@@ -851,7 +847,8 @@ class BadgeClass(ResizeUploadedImage,
     def json(self):
         return self.get_json()
 
-    def get_filtered_json(self, excluded_fields=('@context', 'id', 'type', 'name', 'description', 'image', 'criteria', 'issuer')):
+    def get_filtered_json(self, excluded_fields=('@context', 'id', 'type', 'name',
+            'description', 'image', 'criteria', 'issuer')):
         return super(BadgeClass, self).get_filtered_json(excluded_fields=excluded_fields)
 
     @property
@@ -879,7 +876,8 @@ class BadgeInstance(BaseAuditedModel,
 
     issued_on = models.DateTimeField(blank=False, null=False, default=timezone.now)
 
-    badgeclass = models.ForeignKey(BadgeClass, blank=False, null=False, on_delete=models.CASCADE, related_name='badgeinstances')
+    badgeclass = models.ForeignKey(BadgeClass, blank=False, null=False,
+                                   on_delete=models.CASCADE, related_name='badgeinstances')
     issuer = models.ForeignKey(Issuer, blank=False, null=False,
                                on_delete=models.CASCADE)
     user = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, on_delete=models.SET_NULL)
@@ -891,13 +889,14 @@ class BadgeInstance(BaseAuditedModel,
         (RECIPIENT_TYPE_URL, 'url'),
     )
     recipient_identifier = models.CharField(max_length=768, blank=False, null=False, db_index=True)
-    recipient_type = models.CharField(max_length=255, choices=RECIPIENT_TYPE_CHOICES, default=RECIPIENT_TYPE_EMAIL, blank=False, null=False)
+    recipient_type = models.CharField(max_length=255, choices=RECIPIENT_TYPE_CHOICES,
+                                      default=RECIPIENT_TYPE_EMAIL, blank=False, null=False)
 
     image = models.FileField(upload_to='uploads/badges', blank=True)
 
     # slug has been deprecated for now, but preserve existing values
     slug = models.CharField(max_length=255, db_index=True, blank=True, null=True, default=None)
-    #slug = AutoSlugField(max_length=255, populate_from='get_new_slug', unique=True, blank=False, editable=False)
+    # slug = AutoSlugField(max_length=255, populate_from='get_new_slug', unique=True, blank=False, editable=False)
 
     revoked = models.BooleanField(default=False, db_index=True)
     revocation_reason = models.CharField(max_length=255, blank=True, null=True, default=None)
@@ -983,7 +982,7 @@ class BadgeInstance(BaseAuditedModel,
 
     @property
     def public_url(self):
-        return OriginSetting.HTTP+self.get_absolute_url()
+        return OriginSetting.HTTP + self.get_absolute_url()
 
     @property
     def owners(self):
@@ -1184,7 +1183,8 @@ class BadgeInstance(BaseAuditedModel,
             pass
         return None
 
-    def get_json(self, obi_version=CURRENT_OBI_VERSION, expand_badgeclass=False, expand_issuer=False, include_extra=True, use_canonical_id=False):
+    def get_json(self, obi_version=CURRENT_OBI_VERSION, expand_badgeclass=False,
+            expand_issuer=False, include_extra=True, use_canonical_id=False):
         obi_version, context_iri = get_obi_context(obi_version)
 
         json = OrderedDict([
@@ -1206,7 +1206,8 @@ class BadgeInstance(BaseAuditedModel,
             json['badge'] = self.cached_badgeclass.get_json(obi_version=obi_version, include_extra=include_extra)
 
             if expand_issuer:
-                json['badge']['issuer'] = self.cached_issuer.get_json(obi_version=obi_version, include_extra=include_extra)
+                json['badge']['issuer'] = self.cached_issuer.get_json(
+                    obi_version=obi_version, include_extra=include_extra)
 
         if self.revoked:
             return OrderedDict([
@@ -1280,7 +1281,7 @@ class BadgeInstance(BaseAuditedModel,
         if include_extra:
             extra = self.get_filtered_json()
             if extra is not None:
-                for k,v in list(extra.items()):
+                for k, v in list(extra.items()):
                     if k not in json:
                         json[k] = v
 
@@ -1290,7 +1291,9 @@ class BadgeInstance(BaseAuditedModel,
     def json(self):
         return self.get_json()
 
-    def get_filtered_json(self, excluded_fields=('@context', 'id', 'type', 'uid', 'recipient', 'badge', 'issuedOn', 'image', 'evidence', 'narrative', 'revoked', 'revocationReason', 'verify', 'verification')):
+    def get_filtered_json(self, excluded_fields=('@context', 'id', 'type', 'uid',
+            'recipient', 'badge', 'issuedOn', 'image', 'evidence', 'narrative', 'revoked',
+            'revocationReason', 'verify', 'verification')):
         filtered = super(BadgeInstance, self).get_filtered_json(excluded_fields=excluded_fields)
         # Ensure that the expires date string is in the expected ISO-85601 UTC format
         if filtered is not None and filtered.get('expires', None) and not str(filtered.get('expires')).endswith('Z'):

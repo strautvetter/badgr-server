@@ -19,7 +19,8 @@ class Command(BaseCommand):
         store = DefaultStorage()
         placeholder_storage_name = "placeholder/badge-failed.svg"
         if not store.exists(placeholder_storage_name):
-            with open(os.path.join(TOP_DIR, 'apps', 'mainsite', 'static', 'badgr-ui', 'images', 'badge-failed.svg'), 'rb') as fh:
+            with open(os.path.join(TOP_DIR, 'apps', 'mainsite', 'static', 'badgr-ui',
+                    'images', 'badge-failed.svg'), 'rb') as fh:
                 store.save(placeholder_storage_name, fh)
 
         report = {
@@ -43,18 +44,21 @@ class Command(BaseCommand):
                 remote_image_url = original_json.get('image', None)
                 if remote_image_url:
                     try:
-                        status_code, image = fetch_remote_file_to_storage(remote_image_url, upload_to=badgeclass.image.field.upload_to,
-                                                                          allowed_mime_types=['image/png', 'image/svg+xml'])
+                        status_code, image = fetch_remote_file_to_storage(remote_image_url,
+                                upload_to=badgeclass.image.field.upload_to,
+                                allowed_mime_types=['image/png', 'image/svg+xml'])
                     except IOError as e:
                         self.stdout.write("IOError fetching '{}': {}".format(remote_image_url, str(e)))
                         report['ioerrors'].append((remote_image_url, str(e)))
                     else:
-                        report['status_codes'][status_code] = report['status_codes'].get(status_code, []) + [remote_image_url]
+                        report['status_codes'][status_code] = report['status_codes'].get(
+                            status_code, []) + [remote_image_url]
                         if status_code == 200:
                             badgeclass.image = image
                             badgeclass.save()
                             report['saved'] += 1
-                            self.stdout.write("Saved missing image for badgeclass(pk={}) from '{}'".format(badgeclass.pk, remote_image_url))
+                            self.stdout.write("Saved missing image for badgeclass(pk={}) from '{}'".format(
+                                badgeclass.pk, remote_image_url))
                             continue  # shortcircuit failure handling at end of loop
                         else:
                             self.stdout.write("Http error fetching '{}': {}".format(remote_image_url, status_code))
