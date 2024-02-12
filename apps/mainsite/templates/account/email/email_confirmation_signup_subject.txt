@@ -1,4 +1,4 @@
 {% load i18n %}
 {% autoescape off %}
-{% blocktrans %}Bestätige Deinen myBadges Account{% endblocktrans %}
+{% blocktrans %}Bestätige Deinen OpenEducationalBadges Account{% endblocktrans %}
 {% endautoescape %}
