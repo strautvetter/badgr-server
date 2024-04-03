@@ -1,4 +1,5 @@
 import base64
+import json
 import time
 
 from django import forms
@@ -70,6 +71,7 @@ def info_view(request, *args, **kwargs):
     return redirect(getattr(settings, 'LOGIN_REDIRECT_URL'))
 
 
+# TODO: It is possible to call this method without authentication, thus storing files on the server
 @csrf_exempt
 def upload(req):
     if req.method == 'POST':
@@ -80,6 +82,48 @@ def upload(req):
         store = DefaultStorage()
         store.save(final_filename, uploaded_file)
     return JsonResponse({'filename': final_filename})
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication, SessionAuthentication, BasicAuthentication])
+@permission_classes([IsAuthenticated])
+def aiskills(req, searchterm):
+    searchterm = base64.b64decode(searchterm).decode("utf-8")
+    if req.method != 'GET':
+        return JsonResponse({"error": "Method not allowed"}, status=status.HTTP_400_BAD_REQUEST)
+
+    attempt_num = 0  # keep track of how many times we've retried
+    while attempt_num < 4:
+        apiKey = getattr(settings, 'AISKILLS_API_KEY')
+        endpoint = getattr(settings, 'AISKILLS_ENDPOINT')
+        params = {'api_key': apiKey}
+        payload = {'text_to_analyze': searchterm}
+        headers = {'Content-Type': 'application/json',
+                   'accept': 'application/json'}
+        response = requests.post(endpoint, params=params,
+                                data=json.dumps(payload), headers=headers)
+        print(response.text)
+
+        if response.status_code == 200:
+            data = response.json()
+            return JsonResponse(data, status=status.HTTP_200_OK)
+        elif response.status_code == 403 or response.status_code == 401:
+            # Probably the API KEY was wrong
+            return JsonResponse({"error":
+                "Couldn't authenticate against AI skills service!"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        elif response.status_code == 400:
+            # Invalid input
+            return JsonResponse({"error": "Invalid searchterm!"},
+                status=status.HTTP_400_BAD_REQUEST)
+        else:
+            attempt_num += 1
+            # You can probably use a logger to log the error here
+            time.sleep(5)  # Wait for 5 seconds before re-trying
+
+    return JsonResponse({"error":
+        f"Request failed with status code {response.status_code}"},
+        status=response.status_code)
 
 
 @api_view(['GET'])
