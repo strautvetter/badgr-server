@@ -96,6 +96,7 @@ TEMPLATES = [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.i18n',
                 'django.template.context_processors.media',
+                'django.template.context_processors.request',
                 'django.template.context_processors.static',
                 'django.template.context_processors.tz',
                 'django.contrib.messages.context_processors.messages',
@@ -495,3 +496,5 @@ SAML_LAST_NAME_KEYS = ['LastName', 'sn', 'surname', 'http://schemas.xmlsoap.org/
 # You may use an HTTP service to convert SVG images to PNG for higher reliability than the built-in Python option.
 SVG_HTTP_CONVERSION_ENABLED = False
 SVG_HTTP_CONVERSION_ENDPOINT = ''  # Include scheme, e.g. 'http://example.com/convert-to-png'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
