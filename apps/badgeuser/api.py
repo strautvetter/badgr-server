@@ -357,8 +357,7 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
         # TODO: maybe replace python-memcached with pylibmc  
         cache.delete_many([backoff_cache_key(user.email)])
         # cache.delete(backoff_cache_key(user.email))
-
-
+        
         user.set_password(password)
         user.save()
         return self.get_response()
