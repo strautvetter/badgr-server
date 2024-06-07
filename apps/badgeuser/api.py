@@ -356,7 +356,6 @@ class BadgeUserForgotPassword(BaseUserRecoveryView):
 
         cache.delete(backoff_cache_key(user.email))
         
-
         user.set_password(password)
         user.save()
         return self.get_response()
