@@ -30,6 +30,8 @@ RUN groupadd -g 999 python && \
     useradd -r -u 999 -g python python
 
 RUN mkdir /badgr_server && chown python:python /badgr_server
+RUN touch /badgr_server/user_emails.csv && chown python:python /badgr_server/user_emails.csv
+
 WORKDIR /badgr_server
 
 # Copy installed dependencies
