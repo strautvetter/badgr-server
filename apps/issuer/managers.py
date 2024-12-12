@@ -125,10 +125,12 @@ class BadgeClassManager(BaseOpenBadgeObjectManager):
 
     def image_from_ob2(self, badgeclass_obo):
         image_url = badgeclass_obo.get('image')
-        if isinstance(image_url, dict):
-            image_url = image_url.get('id')
-
-        return _fetch_image_and_get_file(image_url, self.ALLOWED_MINE_TYPES, upload_to='remote/badgeclass')
+        image = None
+        if image_url:
+            if isinstance(image_url, dict):
+                image_url = image_url.get('id')
+            image = _fetch_image_and_get_file(image_url, self.ALLOWED_MINE_TYPES, upload_to='remote/badgeclass')
+        return image
 
     def get_or_create_from_ob2(self, issuer, badgeclass_obo, source=None, original_json=None, image=None):
         source_url = badgeclass_obo.get('id')

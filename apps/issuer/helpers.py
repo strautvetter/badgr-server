@@ -251,6 +251,8 @@ class BadgeCheckHelper(object):
             with transaction.atomic():
                 issuer, issuer_created = Issuer.objects.get_or_create_from_ob2(
                     issuer_obo, original_json=original_json.get(issuer_obo.get('id')), image=issuer_image)
+                # fix: allow unverified issuing for automatic assertions
+                issuer.verified = True 
                 badgeclass, badgeclass_created = BadgeClass.objects.get_or_create_from_ob2(
                     issuer, badgeclass_obo,
                     original_json=original_json.get(badgeclass_obo.get('id')),
