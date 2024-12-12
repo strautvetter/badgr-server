@@ -257,6 +257,9 @@ class BadgeInstanceManager(BaseOpenBadgeObjectManager):
         issued_on = None
         if 'issuedOn' in assertion_obo:
             issued_on = dateutil.parser.parse(assertion_obo.get('issuedOn'))
+        # OB3
+        elif 'issuanceDate' in assertion_obo:
+            issued_on = dateutil.parser.parse(assertion_obo.get('issuanceDate'))
 
         badgeinstance, created = self.get_or_create(
             source_url=assertion_obo.get('id'),

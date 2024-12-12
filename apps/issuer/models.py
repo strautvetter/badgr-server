@@ -1399,6 +1399,10 @@ class BadgeInstance(BaseAuditedModel,
     def get_json(self, obi_version=CURRENT_OBI_VERSION, expand_badgeclass=False,
             expand_issuer=False, include_extra=True, use_canonical_id=False):
 
+        # don't recreate assertions for imported badges
+        if self.original_json:
+            return json_loads(self.original_json)
+
         if obi_version == '3_0':
             return self.get_json_3_0(obi_version, expand_badgeclass, expand_issuer, include_extra, use_canonical_id)
 
@@ -1515,6 +1519,7 @@ class BadgeInstance(BaseAuditedModel,
             ('@context', context_iri),
             ('type', 'Assertion'),
             ('id', add_obi_version_ifneeded(self.jsonld_id, obi_version)),
+            # ('badge', add_obi_version_ifneeded(self.cached_badgeclass.jsonld_id, obi_version)),
             ('type', ["VerifiableCredential", "OpenBadgeCredential"]),
             ('name', self.cached_badgeclass.name),
             ('evidence', [e.get_json(obi_version) for e in self.cached_evidence()]),

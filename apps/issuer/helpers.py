@@ -15,9 +15,13 @@ from requests_cache.backends import BaseCache
 
 import logging
 from issuer.models import Issuer, BadgeClass, BadgeInstance
-from issuer.utils import OBI_VERSION_CONTEXT_IRIS
+from issuer.utils import OBI_VERSION_CONTEXT_IRIS, generate_sha256_hashstring
 from mainsite.utils import first_node_match
 import json
+
+from functools import reduce
+import requests
+from hashlib import sha256
 
 
 logger = logging.getLogger(__name__)
@@ -183,6 +187,74 @@ class BadgeCheckHelper(object):
             # 'cache_backend': cls.cache_instance()  #  just use locmem cache for now
         })
 
+    @classmethod 
+    def validate_v3(cls, input, recipient_profile_in):
+
+        session = requests.Session()
+
+        recipient_profile_out = {}
+
+        # validate hashed email
+        try:
+            credential_subject = input.get('credentialSubject')
+            credential_identifiers = credential_subject.get('identifier')
+            for credential_identifier in credential_identifiers:
+                if credential_identifier.get('identityType') == 'emailAddress':
+                    identity_hash = credential_identifier.get('identityHash')
+                    identity_salt = credential_identifier.get('salt')
+                    for email in recipient_profile_in['email']:
+                        hashed_mail = generate_sha256_hashstring(email, identity_salt)
+                        if hashed_mail == identity_hash:
+                            recipient_profile_out['email'] = email
+
+        except KeyError:
+            pass
+
+        if not recipient_profile_out:
+            raise ValidationError([{'name': "RECIPIENT_VERIFICATION", 'description': "Recipients do not match"}])
+
+        assertion_id = input.get('id')
+        assertion_obo = input
+        issuer_id = input.get('issuer').get('id')
+        issuer_obo = {}
+        badgeclass_id = input.get('credentialSubject').get('achievement').get('id')
+        badgeclass_obo = {}
+
+        # load json if ids are urls
+        try:
+            result = session.get(
+                issuer_id, headers={'Accept': 'application/ld+json, application/json'}
+            )
+            result_text = result.content.decode()
+            issuer_obo = json.loads(result_text)
+        except Exception:
+            pass
+
+        try:
+            result = session.get(
+                badgeclass_id, headers={'Accept': 'application/ld+json, application/json'}
+            )
+            result_text = result.content.decode()
+            badgeclass_obo = json.loads(result_text)
+        except Exception:
+            pass
+
+        return {
+            'report': {
+                'validationSubject': '',
+                'errorCount': 0,
+                'warningCount': 0,
+                'messages': [],
+                'recipientProfile': recipient_profile_out,
+                'valid': True,
+            },
+            'graph': [],
+            'input': input,
+            'assertion_obo': assertion_obo,
+            'issuer_obo': issuer_obo,
+            'badgeclass_obo': badgeclass_obo,
+        }
+
     @classmethod
     def get_or_create_assertion(cls, url=None, imagefile=None, assertion=None, created_by=None):
 
@@ -203,14 +275,42 @@ class BadgeCheckHelper(object):
         else:
             badgecheck_recipient_profile = None
 
+        is_v3 = False
+
         try:
             if type(query) is dict:
                 try:
                     query = json.dumps(query)
                 except (TypeError, ValueError):
                     raise ValidationError("Could not parse dict to json")
-            response = openbadges.verify(
-                query, recipient_profile=badgecheck_recipient_profile, **cls.badgecheck_options())
+
+            # use openbadges library to parse json from images
+            verifier_store = openbadges.load_store(query, recipient_profile=badgecheck_recipient_profile, **cls.badgecheck_options())
+            query_json = verifier_store.get_state()['input']['value']
+            verifier_input = json.loads(query_json)
+
+            # jwt
+            try:
+                verifier_input = verifier_input['vc']
+            except:
+                pass
+
+            context = verifier_input['@context']
+            if isinstance(context, str):
+                context = [verifier_input['@context']]
+
+            # check for vc json-ld context
+            is_v3 = reduce(lambda x, y: x or '/credentials/' in y, context, False)
+
+            if is_v3:
+                # skip openbadges library validator
+                response = cls.validate_v3(verifier_input, badgecheck_recipient_profile)
+
+            else:
+                # ob2 validation through openbadges library
+                response = openbadges.verify(
+                    query, recipient_profile=badgecheck_recipient_profile, **cls.badgecheck_options())
+
         except ValueError as e:
             raise ValidationError([{'name': "INVALID_BADGE", 'description': str(e)}])
 
@@ -224,21 +324,29 @@ class BadgeCheckHelper(object):
                 errors = [{'name': "UNABLE_TO_VERIFY", 'description': "Unable to verify the assertion"}]
             raise ValidationError(errors)
 
-        graph = response.get('graph', [])
+        if not is_v3:
+            graph = response.get('graph', [])
 
-        assertion_obo = first_node_match(graph, dict(type="Assertion"))
-        if not assertion_obo:
-            raise ValidationError([{'name': "ASSERTION_NOT_FOUND", 'description': "Unable to find an assertion"}])
+            assertion_obo = first_node_match(graph, dict(type="Assertion"))
+            if not assertion_obo:
+                raise ValidationError([{'name': "ASSERTION_NOT_FOUND", 'description': "Unable to find an assertion"}])
 
-        badgeclass_obo = first_node_match(graph, dict(id=assertion_obo.get('badge', None)))
-        if not badgeclass_obo:
-            raise ValidationError([{'name': "ASSERTION_NOT_FOUND", 'description': "Unable to find a badgeclass"}])
+            badgeclass_obo = first_node_match(graph, dict(id=assertion_obo.get('badge', None)))
+            if not badgeclass_obo:
+                raise ValidationError([{'name': "ASSERTION_NOT_FOUND", 'description': "Unable to find a badgeclass"}])
 
-        issuer_obo = first_node_match(graph, dict(id=badgeclass_obo.get('issuer', None)))
-        if not issuer_obo:
-            raise ValidationError([{'name': "ASSERTION_NOT_FOUND", 'description': "Unable to find an issuer"}])
+            issuer_obo = first_node_match(graph, dict(id=badgeclass_obo.get('issuer', None)))
+            if not issuer_obo:
+                raise ValidationError([{'name': "ASSERTION_NOT_FOUND", 'description': "Unable to find an issuer"}])
 
-        original_json = response.get('input').get('original_json', {})
+            original_json = response.get('input').get('original_json', {})
+
+        else:
+            assertion_obo = response['assertion_obo']
+            badgeclass_obo = response['badgeclass_obo']
+            issuer_obo = response['issuer_obo']
+
+            original_json = response.get('input')
 
         recipient_profile = report.get('recipientProfile', {})
         recipient_type, recipient_identifier = list(recipient_profile.items())[0]
@@ -260,7 +368,7 @@ class BadgeCheckHelper(object):
                 return BadgeInstance.objects.get_or_create_from_ob2(
                     badgeclass, assertion_obo,
                     recipient_identifier=recipient_identifier, recipient_type=recipient_type,
-                    original_json=original_json.get(assertion_obo.get('id')), image=badgeinstance_image
+                    original_json=json.dumps(original_json), image=badgeinstance_image
                 )
         try:
             return commit_new_badge()
