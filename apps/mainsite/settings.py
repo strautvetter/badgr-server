@@ -79,6 +79,7 @@ MIDDLEWARE = [
     'badgeuser.middleware.InactiveUserMiddleware',
     # 'mainsite.middleware.TrailingSlashMiddleware',
     'django_prometheus.middleware.PrometheusAfterMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 DBBACKUP_STORAGE = 'django.core.files.storage.FileSystemStorage'
