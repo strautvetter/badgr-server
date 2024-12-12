@@ -3,9 +3,14 @@ import hashlib
 import pytz
 import re
 from urllib.parse import urlparse, urlunparse
+import copy
 
 from django.urls import resolve, Resolver404
 from django.utils import timezone
+from django.conf import settings
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from mainsite.utils import OriginSetting
 
@@ -13,13 +18,19 @@ from mainsite.utils import OriginSetting
 OBI_VERSION_CONTEXT_IRIS = {
     '1_1': 'https://w3id.org/openbadges/v1',
     '2_0': 'https://w3id.org/openbadges/v2',
+    '3_0': [
+        "https://www.w3.org/2018/credentials/v1",
+        "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.1.json",
+        # "https://www.w3.org/ns/credentials/v2",
+        # "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
+    ],
 }
 
-CURRENT_OBI_VERSION = '2_0'
+CURRENT_OBI_VERSION = '3_0'
 CURRENT_OBI_CONTEXT_IRI = OBI_VERSION_CONTEXT_IRIS.get(CURRENT_OBI_VERSION)
 
 # assertions that were baked and saved to BadgeInstance.image used this version
-UNVERSIONED_BAKED_VERSION = '2_0'
+UNVERSIONED_BAKED_VERSION = '3_0'
 
 
 def get_obi_context(obi_version):
@@ -27,14 +38,15 @@ def get_obi_context(obi_version):
     if context_iri is None:
         obi_version = CURRENT_OBI_VERSION
         context_iri = CURRENT_OBI_CONTEXT_IRI
-    return (obi_version, context_iri)
+    return (obi_version, copy.copy(context_iri))    # make sure IRI as list gets passed by value
 
 
 def add_obi_version_ifneeded(url, obi_version):
-    if obi_version == CURRENT_OBI_VERSION:
-        return url
-    if not url.startswith(OriginSetting.HTTP):
-        return url
+    # FIXME: always version?
+    # if obi_version == CURRENT_OBI_VERSION:
+    #     return url
+    # if not url.startswith(OriginSetting.HTTP):
+    #     return url
     return "{url}{sep}v={obi_version}".format(
         url=url,
         sep='&' if '?' in url else '?',
@@ -163,3 +175,12 @@ def sanitize_id(recipient_identifier, identifier_type, allow_uppercase=False):
             p.fragment,
         ))
     return recipient_identifier
+
+def generate_private_key_pem():
+    private_key = ed25519.Ed25519PrivateKey.generate()
+    encrypted_key = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.BestAvailableEncryption(settings.SECRET_KEY.encode())
+    ).decode()
+    return encrypted_key

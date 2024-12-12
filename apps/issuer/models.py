@@ -4,6 +4,8 @@ import urllib.request
 import urllib.parse
 import urllib.error
 import base64
+import base58
+from hashlib import sha256
 
 import dateutil
 import re
@@ -30,6 +32,11 @@ from jsonfield import JSONField
 from openbadges_bakery import bake
 from django.utils import timezone
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ed25519
+
+from pyld import jsonld
+
 import badgrlog
 from entity.models import BaseVersionedEntity
 from issuer.managers import BadgeInstanceManager, IssuerManager, BadgeClassManager, BadgeInstanceEvidenceManager
@@ -39,7 +46,8 @@ from mainsite.models import BadgrApp, EmailBlacklist
 from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri, get_name
 from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, generate_rebaked_filename,
-                    generate_sha256_hashstring, get_obi_context, parse_original_datetime, UNVERSIONED_BAKED_VERSION)
+                    generate_sha256_hashstring, get_obi_context, parse_original_datetime, UNVERSIONED_BAKED_VERSION,
+                    generate_private_key_pem)
 
 from geopy.geocoders import Nominatim
 AUTH_USER_MODEL = getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
@@ -222,6 +230,8 @@ class Issuer(ResizeUploadedImage,
     lat = models.FloatField(null=True, blank=True)
     lon = models.FloatField(null=True, blank=True)
 
+    private_key = models.CharField(max_length=512, blank=True, null=True, default=generate_private_key_pem)
+
     def publish(self, publish_staff=True, *args, **kwargs):
         fields_cache = self._state.fields_cache  # stash the fields cache to avoid publishing related objects here
         self._state.fields_cache = dict()
@@ -236,7 +246,7 @@ class Issuer(ResizeUploadedImage,
     def has_nonrevoked_assertions(self):
         return self.badgeinstance_set.filter(revoked=False).exists()
 
-    def delete(self, *args, **kwargs):        
+    def delete(self, *args, **kwargs):
         if self.has_nonrevoked_assertions():
             raise ProtectedError("Issuer can not be deleted because it has previously issued badges.", self)
 
@@ -306,7 +316,7 @@ class Issuer(ResizeUploadedImage,
 
         An issuer staff relation is either created with role owner
         (if none existed), or updated to contain the role
-        ROLE_OWNER. 
+        ROLE_OWNER.
         Earlier this also made sure that the creator was the owner;
         since this doesn't seem to be required anymore though,
         this now merely makes sure that both a creator and an
@@ -354,7 +364,7 @@ class Issuer(ResizeUploadedImage,
             issuerStaff.role = IssuerStaff.ROLE_OWNER
             issuerStaff.save()
             return
-        
+
         # The last remaining case is that the created_by user still exists, but got removed as owner
         # In this case there must be no owner assigned currently, so we chose a new owner
         editors = self.staff.filter(issuerstaff__role=IssuerStaff.ROLE_EDITOR)
@@ -370,7 +380,7 @@ class Issuer(ResizeUploadedImage,
             return
         new_owner.role = IssuerStaff.ROLE_OWNER
         new_owner.save()
-    
+
     def new_contact_email(self):
         # If this method is called, this may mean that the owner got deleted.
         # This implicates that we have to take measures to ensure a new owner is applied.
@@ -464,7 +474,7 @@ class Issuer(ResizeUploadedImage,
     @cachemodel.cached_method(auto_publish=True)
     def cached_badgeclasses(self):
         return self.badgeclasses.all().order_by("created_at")
-    
+
     @cachemodel.cached_method(auto_publish=True)
     def cached_learningpaths(self):
         return self.learningpaths.all().order_by("created_at")
@@ -476,10 +486,12 @@ class Issuer(ResizeUploadedImage,
     def get_json(self, obi_version=CURRENT_OBI_VERSION, include_extra=True, use_canonical_id=False):
         obi_version, context_iri = get_obi_context(obi_version)
 
+        id = self.jsonld_id if use_canonical_id else add_obi_version_ifneeded(self.jsonld_id, obi_version)
+
         json = OrderedDict({'@context': context_iri})
         json.update(OrderedDict(
             type='Issuer',
-            id=self.jsonld_id if use_canonical_id else add_obi_version_ifneeded(self.jsonld_id, obi_version),
+            id=id,
             name=self.name,
             url=self.url,
             email=self.email,
@@ -516,6 +528,39 @@ class Issuer(ResizeUploadedImage,
                 for k, v in list(extra.items()):
                     if k not in json:
                         json[k] = v
+
+
+        # add verificationMethod
+        if obi_version == '3_0':
+
+            private_key = serialization.load_pem_private_key(
+                self.private_key.encode(),
+                settings.SECRET_KEY.encode()
+            )
+            public_key = private_key.public_key()
+
+            # for multicodec
+            ed01_prefix = b'\xed\x01'
+
+            public_key_bytes = public_key.public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw
+            )
+
+            public_key_base58 = base58.b58encode(
+                ed01_prefix + public_key_bytes
+            ).decode()
+
+            # z prefix for multibase 58
+            public_key_multibase = f'z{public_key_base58}'
+
+            json['verificationMethod'] = OrderedDict({
+                "id": f"{id}#key-0",
+                "type": "DataIntegrityProof",
+                "cryptosuite": "eddsa-rdf-2022",
+                "controller": id,
+                "publicKeyMultibase": public_key_multibase
+            })
 
         return json
 
@@ -565,13 +610,13 @@ class Issuer(ResizeUploadedImage,
         # Notify admin whether issuer was automatically verified or needs to be verified manually
         if self.verified:
             template_name = 'issuer/email/notify_admins_issuer_verified'
-        else: 
+        else:
             template_name = 'issuer/email/notify_admins'
 
         adapter = get_adapter()
         for user in users:
             adapter.send_mail(template_name, user.email, context=email_context)
- 
+
     # Notify Issuer owner when issuer gets verified
     def notify_issuer_owner(self, badgr_app=None, renotify=False):
         """
@@ -635,7 +680,7 @@ class IssuerStaff(cachemodel.CacheModel):
         # *also* has to be contained in the delete method of the user
         if (new_contact):
             self.issuer.new_contact_email()
-    
+
     def is_staff_contact(self) -> bool:
         # Get verified emails of associated user
         user_emails = self.user.verified_emails
@@ -720,11 +765,11 @@ class BadgeClass(ResizeUploadedImage,
 
     class Meta:
         verbose_name_plural = "Badge classes"
-    
+
     def save(self, *args, **kwargs):
         self.clean()
         return super().save(*args, **kwargs)
-    
+
     def clean(self):
         # Check if the issuer for this badge is verified, otherwise throw an error
         if not self.issuer.verified:
@@ -947,6 +992,9 @@ class BadgeClass(ResizeUploadedImage,
         if obi_version == '2_0':
             json['alignment'] = [a.get_json(obi_version=obi_version) for a in self.cached_alignments()]
             json['tags'] = list(t.name for t in self.cached_tags())
+
+        # required
+        json['extensions:CompetencyExtension'] = []
 
         # extensions
         if len(self.cached_extensions()) > 0:
@@ -1264,14 +1312,14 @@ class BadgeInstance(BaseAuditedModel,
             badgr_app = BadgrApp.objects.get_current(None)
 
         adapter = get_adapter()
-        
+
         # get the base url for the badge instance
         httpPrefix = 'https://' if settings.SECURE_SSL_REDIRECT else 'http://'
         base_url = httpPrefix + badgr_app.cors
 
         pdf_document = adapter.generate_pdf_content(slug =  self.entity_id, base_url = base_url)
         encoded_pdf_document = base64.b64encode(pdf_document).decode('utf-8')
-        data_url = f"data:application/pdf;base64,{encoded_pdf_document}"    
+        data_url = f"data:application/pdf;base64,{encoded_pdf_document}"
 
         try:
             if self.issuer.image:
@@ -1350,6 +1398,10 @@ class BadgeInstance(BaseAuditedModel,
 
     def get_json(self, obi_version=CURRENT_OBI_VERSION, expand_badgeclass=False,
             expand_issuer=False, include_extra=True, use_canonical_id=False):
+
+        if obi_version == '3_0':
+            return self.get_json_3_0(obi_version, expand_badgeclass, expand_issuer, include_extra, use_canonical_id)
+
         obi_version, context_iri = get_obi_context(obi_version)
 
         json = OrderedDict([
@@ -1449,6 +1501,182 @@ class BadgeInstance(BaseAuditedModel,
                 for k, v in list(extra.items()):
                     if k not in json:
                         json[k] = v
+
+        return json
+
+    def get_json_3_0(self, obi_version=CURRENT_OBI_VERSION, expand_badgeclass=False,
+            expand_issuer=False, include_extra=True, use_canonical_id=False):
+
+        obi_version, context_iri = get_obi_context(obi_version)
+
+        hashed_recipient = generate_sha256_hashstring(self.recipient_identifier, self.salt)
+
+        json = OrderedDict([
+            ('@context', context_iri),
+            ('type', 'Assertion'),
+            ('id', add_obi_version_ifneeded(self.jsonld_id, obi_version)),
+            ('type', ["VerifiableCredential", "OpenBadgeCredential"]),
+            ('name', self.cached_badgeclass.name),
+            ('evidence', [e.get_json(obi_version) for e in self.cached_evidence()]),
+            ('issuer', {
+                'id': add_obi_version_ifneeded(self.cached_issuer.jsonld_id, obi_version),
+                'type': ["Profile"],
+                'name': self.cached_issuer.name,
+                'url': self.cached_issuer.url,
+                'email': self.cached_issuer.email,
+            }),
+            ('validFrom', self.issued_on.isoformat()),
+            ('issuanceDate', self.issued_on.isoformat()),
+            ('credentialSubject', {
+                'type': ["AchievementSubject"],
+                'identifier': [{
+                    'type': "IdentityObject",
+                    'identityHash': hashed_recipient,
+                    'identityType': 'emailAddress',
+                    'hashed': True,
+                    'salt': self.salt
+                }],
+                'achievement': {
+                    'id': add_obi_version_ifneeded(self.cached_badgeclass.jsonld_id, obi_version),
+                    'type': ['Achievement'],
+                    'name': self.cached_badgeclass.name,
+                    'description': self.cached_badgeclass.description,
+                    'achievementType': 'Badge',
+                    'criteria': {
+                        'narrative': self.narrative or "",
+                    },
+                    "image": {
+                        "id": self.image_url(public=True),
+                        "type": "Image"
+                    }
+                }
+            }),
+        ])
+
+        if self.expires_at:
+            json['expirationDate'] = self.expires_at.isoformat()
+
+
+        if self.revoked:
+            # FIXME: https://www.imsglobal.org/spec/ob/v3p0/cert#verification-and-status
+            # id as url to list of revokations?
+            # example(?) https://github.com/openwallet-foundation-labs/learner-credential-wallet/issues/656
+            json['credentialStatus'] = {
+                'id': add_obi_version_ifneeded(self.jsonld_id, obi_version),
+                'type': "1EdTechRevocationList"
+            }
+
+        # extensions
+        if len(self.cached_extensions()) > 0:
+            extension_contexts = []
+            for extension in self.cached_extensions():
+                extension_json = json_loads(extension.original_json)
+                extension_name = extension.name
+                if extension_name.find('extensions:') == 0:
+                    extension_name = extension_name[11:]
+
+                try:
+                    extension_context = extension_json['@context']
+                    if isinstance(extension_context, list):
+                        extension_contexts += extension_context
+                    else:
+                        extension_contexts.append(extension_context)
+
+                    del extension_json['@context']
+
+                except KeyError:
+                    pass
+
+                json[extension_name] = extension_json
+
+            # unique
+            extension_contexts = list(set(extension_contexts))
+            json['@context'] += extension_contexts
+
+
+        # TODO link to v2 version? is this correct?
+            # json['related'] = [{
+            #     'type': [
+            #         "Related",
+            #         "https://w3id.org/openbadges#BadgeClass"
+            #     ],
+            #     "id": add_obi_version_ifneeded(self.jsonld_id, '2_0'),
+            #     "version": "Open Badges v2p0"
+            # }]
+
+
+        ##### proof / signing #####
+
+        # as RSA JWT, needs rsa private key
+            # import jwt
+            # private_key = serialization.load_pem_private_key(
+            #     self.cached_issuer.private_key.encode(),
+            #     settings.SECRET_KEY.encode()
+            # )
+
+            # json = {**json, **{
+            #     'iss': json['issuer']['id'],            # issuer.id
+            #     'jti': json['id'],                      # vc.id
+            #     'nbf': self.issued_on.isoformat(),      # validFrom
+            #     # 'sub': json['credentialSubject']['id']  # credentialSubject.id
+            #     }
+            # }
+
+            # if self.expires_at:
+            #     json['exp'] = self.expires_at.isoformat()
+
+            # jwk = jwt.algorithms.RSAAlgorithm.to_jwk(key=private_key)
+            # private_key_bytes = private_key.private_bytes(
+            #     encoding=serialization.Encoding.Raw,
+            #     format=serialization.PrivateFormat.Raw,
+            #     encryption_algorithm=serialization.NoEncryption()
+            # )
+
+            # jwt_token = jwt.encode(json, key=jwk, headers={
+            #     'kid': jwk,
+            # })
+            # json = jwt_token
+
+            # return json
+
+
+        # load private key
+        private_key = serialization.load_pem_private_key(
+            self.cached_issuer.private_key.encode(),
+            settings.SECRET_KEY.encode()
+        )
+
+        # basic proof dict with added @context
+        proof = OrderedDict([
+            ("@context", "https://w3id.org/security/data-integrity/v1"),
+            # ("@context", "https://www.w3.org/ns/credentials/v2"), # for newer version
+            ("type", "DataIntegrityProof"),
+            ("cryptosuite", "eddsa-rdfc-2022"),
+            ("created", self.issued_on.isoformat()),
+            ("verificationMethod", f'{add_obi_version_ifneeded(self.cached_issuer.jsonld_id, obi_version)}#key-0'),
+            ("proofPurpose", "assertionMethod"),
+        ])
+
+        # transform https://www.w3.org/TR/vc-di-eddsa/#transformation-eddsa-rdfc-2022
+        canonicalized_proof = jsonld.normalize(proof, {'algorithm': 'URDNA2015', 'format': 'application/n-quads'})
+        canonicalized_json = jsonld.normalize(json, {'algorithm': 'URDNA2015', 'format': 'application/n-quads'})
+
+        # hash transformed documents, 32bit each
+        hashed_proof = sha256(canonicalized_proof.encode()).digest()
+        hashed_json = sha256(canonicalized_json.encode()).digest()
+
+        # concat for 64bit hash ans sign
+        signature = private_key.sign(hashed_proof + hashed_json)
+
+        # base58 encode with multibase prefix z
+        proof['proofValue'] = f"z{base58.b58encode(signature).decode()}"
+
+        # remove proof @context
+        del proof['@context']
+
+        # add proof to json
+        json['proof'] = [proof]
+
 
         return json
 
@@ -1714,7 +1942,7 @@ class QrCode(BaseVersionedEntity):
                                on_delete=models.CASCADE)
 
     title = models.CharField(max_length=254, blank=False, null=False)
-    
+
     createdBy = models.CharField(max_length=254, blank=False, null=False)
 
     valid_from = models.DateTimeField(blank=True, null=True, default=None)
@@ -1751,7 +1979,7 @@ class LearningPath(BaseVersionedEntity, BaseAuditedModel):
     @property
     def public_url(self):
         return OriginSetting.HTTP + self.get_absolute_url()
-    
+
     @property
     def v1_api_participant_count(self):
         return LearningPathParticipant.objects.filter(learning_path=self).count()
@@ -1760,7 +1988,7 @@ class LearningPath(BaseVersionedEntity, BaseAuditedModel):
     def cached_badgrapp(self):
         id = self.badgrapp_id if self.badgrapp_id else None
         return BadgrApp.objects.get_by_id_or_default(badgrapp_id=id)
-    
+
     @property
     def cached_issuer(self):
         return Issuer.cached.get(pk=self.issuer_id)
@@ -1772,7 +2000,7 @@ class LearningPath(BaseVersionedEntity, BaseAuditedModel):
     @property
     def learningpath_badges(self):
         return self.cached_learningpathbadges()
-    
+
     @learningpath_badges.setter
     def learningpath_badges(self, badges_with_order):
         self.learningpathbadge_set.all().delete()
@@ -1818,16 +2046,16 @@ class LearningPath(BaseVersionedEntity, BaseAuditedModel):
             slug=self.entity_id,
             issuer_id= self.issuer.entity_id
             ))
-        
-        tags = self.learningpathtag_set.all()  
-        badges = self.learningpathbadge_set.all() 
+
+        tags = self.learningpathtag_set.all()
+        badges = self.learningpathbadge_set.all()
         image = self.participationBadge.image.url
-        
+
         json['tags'] = list(t.name for t in tags)
 
         json['badges'] = [
             {
-                'badge': badge.badge.get_json(obi_version=obi_version), 
+                'badge': badge.badge.get_json(obi_version=obi_version),
                 'order': badge.order
             }
             for badge in badges
@@ -1835,10 +2063,10 @@ class LearningPath(BaseVersionedEntity, BaseAuditedModel):
 
         json["image"] = image
 
-        return json 
+        return json
 
     def get_absolute_url(self):
-        return reverse('learningpath_json', kwargs={'entity_id': self.entity_id})               
+        return reverse('learningpath_json', kwargs={'entity_id': self.entity_id})
 
 class LearningPathBadge(cachemodel.CacheModel):
     learning_path = models.ForeignKey(LearningPath, on_delete=models.CASCADE)
@@ -1867,7 +2095,7 @@ class LearningPathParticipant(BaseVersionedEntity, BaseAuditedModel):
         badgeinstances = self.user.cached_badgeinstances().filter(badgeclass__in=lp_badgeclasses, revoked=False)
         badgeclasses = list({badgeinstance.badgeclass for badgeinstance in badgeinstances})
         return badgeclasses
-        # return self.user.earned_badges.filter(learningpath=self.learning_path)    
+        # return self.user.earned_badges.filter(learningpath=self.learning_path)
 
     @property
     def participationBadgeAssertion(self):
@@ -1876,13 +2104,13 @@ class LearningPathParticipant(BaseVersionedEntity, BaseAuditedModel):
             if badgeinstance is not None:
                 return badgeinstance
         else:
-            return None 
-           
+            return None
+
     @property
     def cached_user(self):
         from badgeuser.models import BadgeUser
-        return BadgeUser.cached.get(pk=self.user_id)    
-    
+        return BadgeUser.cached.get(pk=self.user_id)
+
 class RequestedLearningPath(BaseVersionedEntity):
 
     learningpath = models.ForeignKey(LearningPath, blank=False, null=False,
@@ -1891,4 +2119,4 @@ class RequestedLearningPath(BaseVersionedEntity):
 
     requestedOn = models.DateTimeField(blank=False, null=False, default=timezone.now)
 
-    status = models.CharField(max_length=254, blank=False, null=False, default='Pending')    
+    status = models.CharField(max_length=254, blank=False, null=False, default='Pending')

@@ -552,3 +552,9 @@ OIDC_STORE_ID_TOKEN = False
 # Make the Django session expire after 1 minute, so that the UI has 1 minute to convert the session authentication
 # into an access token
 SESSION_COOKIE_AGE = 60
+
+LOGIN_BASE_URL = ''
+
+# Don't change these
+LOGIN_REDIRECT_URL = f'{LOGIN_BASE_URL}?validateToken'
+LOGOUT_REDIRECT_URL = f'{LOGIN_BASE_URL}'
