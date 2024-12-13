@@ -45,7 +45,7 @@ from mainsite.mixins import HashUploadedImage, ResizeUploadedImage, ScrubUploade
 from mainsite.models import BadgrApp, EmailBlacklist
 from mainsite import blacklist
 from mainsite.utils import OriginSetting, generate_entity_uri, get_name
-from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, generate_rebaked_filename,
+from .utils import (add_obi_version_ifneeded, CURRENT_OBI_VERSION, assertion_is_v3, generate_rebaked_filename,
                     generate_sha256_hashstring, get_obi_context, parse_original_datetime, UNVERSIONED_BAKED_VERSION,
                     generate_private_key_pem)
 
@@ -1399,9 +1399,17 @@ class BadgeInstance(BaseAuditedModel,
     def get_json(self, obi_version=CURRENT_OBI_VERSION, expand_badgeclass=False,
             expand_issuer=False, include_extra=True, use_canonical_id=False):
 
-        # don't recreate assertions for imported badges
+        # don't recreate assertions for imported badges, exception for badgr-ui frontend code
         if self.original_json:
-            return json_loads(self.original_json)
+            json = json_loads(self.original_json)
+            # FIXME add objects for badgr-ui frontend assertion handling
+            if expand_badgeclass:
+                json['badge'] = self.cached_badgeclass.get_json(obi_version=obi_version, include_extra=include_extra)
+
+                if expand_issuer:
+                    json['badge']['issuer'] = self.cached_issuer.get_json(obi_version=obi_version, include_extra=include_extra)
+
+            return json
 
         if obi_version == '3_0':
             return self.get_json_3_0(obi_version, expand_badgeclass, expand_issuer, include_extra, use_canonical_id)
@@ -1682,6 +1690,13 @@ class BadgeInstance(BaseAuditedModel,
         # add proof to json
         json['proof'] = [proof]
 
+        # FIXME add badge object for badgr-ui frontend assertion handling, not a valid ob3 vc key
+        if expand_badgeclass:
+            json['badge'] = self.cached_badgeclass.get_json(obi_version=obi_version, include_extra=include_extra)
+
+            # FIXME add issuer object for badgr-ui frontend assertion handling, not a valid ob3 vc key
+            if expand_issuer:
+                json['badge']['issuer'] = self.cached_issuer.get_json(obi_version=obi_version, include_extra=include_extra)
 
         return json
 

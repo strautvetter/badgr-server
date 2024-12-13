@@ -1,3 +1,4 @@
+from functools import reduce
 import aniso8601
 import hashlib
 import pytz
@@ -184,3 +185,11 @@ def generate_private_key_pem():
         encryption_algorithm=serialization.BestAvailableEncryption(settings.SECRET_KEY.encode())
     ).decode()
     return encrypted_key
+
+def assertion_is_v3(assertion_json):
+    context = assertion_json['@context']
+    # if @context is string it's probably v2
+    if isinstance(context, str):
+        return False
+    # search for vc context IRIs
+    return reduce(lambda x, y: x or '/credentials/' in y, context, False)

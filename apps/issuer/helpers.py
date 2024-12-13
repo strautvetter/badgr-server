@@ -15,14 +15,11 @@ from requests_cache.backends import BaseCache
 
 import logging
 from issuer.models import Issuer, BadgeClass, BadgeInstance
-from issuer.utils import OBI_VERSION_CONTEXT_IRIS, generate_sha256_hashstring
+from issuer.utils import OBI_VERSION_CONTEXT_IRIS, assertion_is_v3, generate_sha256_hashstring
 from mainsite.utils import first_node_match
 import json
 
-from functools import reduce
 import requests
-from hashlib import sha256
-
 
 logger = logging.getLogger(__name__)
 
@@ -295,12 +292,7 @@ class BadgeCheckHelper(object):
             except:
                 pass
 
-            context = verifier_input['@context']
-            if isinstance(context, str):
-                context = [verifier_input['@context']]
-
-            # check for vc json-ld context
-            is_v3 = reduce(lambda x, y: x or '/credentials/' in y, context, False)
+            is_v3 = assertion_is_v3(verifier_input)
 
             if is_v3:
                 # skip openbadges library validator
