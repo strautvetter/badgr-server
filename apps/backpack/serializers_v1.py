@@ -457,7 +457,7 @@ class V1BadgeInstanceSerializer(V1InstanceSerializer):
     pending = serializers.ReadOnlyField()
 
     def to_representation(self, instance):
-        localbadgeinstance_json = instance.json
+        localbadgeinstance_json = instance.get_json(obi_version='2_0')  # FIXME force older obi version for badgr-ui performance
         if 'evidence' in localbadgeinstance_json:
             localbadgeinstance_json['evidence'] = instance.evidence_url
         localbadgeinstance_json['uid'] = instance.entity_id
