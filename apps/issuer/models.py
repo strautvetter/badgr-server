@@ -1527,7 +1527,6 @@ class BadgeInstance(BaseAuditedModel,
             ('@context', context_iri),
             ('type', 'Assertion'),
             ('id', add_obi_version_ifneeded(self.jsonld_id, obi_version)),
-            # ('badge', add_obi_version_ifneeded(self.cached_badgeclass.jsonld_id, obi_version)),
             ('type', ["VerifiableCredential", "OpenBadgeCredential"]),
             ('name', self.cached_badgeclass.name),
             ('evidence', [e.get_json(obi_version) for e in self.cached_evidence()]),
@@ -1539,7 +1538,6 @@ class BadgeInstance(BaseAuditedModel,
                 'email': self.cached_issuer.email,
             }),
             ('validFrom', self.issued_on.isoformat()),
-            ('issuanceDate', self.issued_on.isoformat()),
             ('credentialSubject', {
                 'type': ["AchievementSubject"],
                 'identifier': [{
@@ -1567,7 +1565,8 @@ class BadgeInstance(BaseAuditedModel,
         ])
 
         if self.expires_at:
-            json['expirationDate'] = self.expires_at.isoformat()
+            # json['expirationDate'] = self.expires_at.isoformat()
+            json['validUntil'] = self.expires_at.isoformat()
 
 
         if self.revoked:
@@ -1579,32 +1578,34 @@ class BadgeInstance(BaseAuditedModel,
                 'type': "1EdTechRevocationList"
             }
 
-        # extensions
-        if len(self.cached_extensions()) > 0:
-            extension_contexts = []
-            for extension in self.cached_extensions():
-                extension_json = json_loads(extension.original_json)
-                extension_name = extension.name
-                if extension_name.find('extensions:') == 0:
-                    extension_name = extension_name[11:]
+        # FIXME extensions
+        # if len(self.cached_extensions()) > 0:
+        #     extension_contexts = [
+        #         # "https://purl.imsglobal.org/spec/ob/v3p0/extensions.json"
+        #     ]
+        #     for extension in self.cached_extensions():
+        #         extension_json = json_loads(extension.original_json)
+        #         extension_name = extension.name
+        #         # if extension_name.find('extensions:') == 0:
+        #         #     extension_name = extension_name[11:]
 
-                try:
-                    extension_context = extension_json['@context']
-                    if isinstance(extension_context, list):
-                        extension_contexts += extension_context
-                    else:
-                        extension_contexts.append(extension_context)
+        #         try:
+        #             extension_context = extension_json['@context']
+        #             if isinstance(extension_context, list):
+        #                 extension_contexts += extension_context
+        #             else:
+        #                 extension_contexts.append(extension_context)
 
-                    del extension_json['@context']
+        #             # del extension_json['@context']
 
-                except KeyError:
-                    pass
+        #         except KeyError:
+        #             pass
 
-                json[extension_name] = extension_json
+        #         json[extension_name] = extension_json
 
-            # unique
-            extension_contexts = list(set(extension_contexts))
-            json['@context'] += extension_contexts
+        #     # unique
+        #     extension_contexts = list(set(extension_contexts))
+        #     # json['@context'] += extension_contexts
 
 
         # TODO link to v2 version? is this correct?
@@ -1661,8 +1662,7 @@ class BadgeInstance(BaseAuditedModel,
 
         # basic proof dict with added @context
         proof = OrderedDict([
-            ("@context", "https://w3id.org/security/data-integrity/v1"),
-            # ("@context", "https://www.w3.org/ns/credentials/v2"), # for newer version
+            ("@context", "https://www.w3.org/ns/credentials/v2"),
             ("type", "DataIntegrityProof"),
             ("cryptosuite", "eddsa-rdfc-2022"),
             ("created", self.issued_on.isoformat()),
@@ -1671,12 +1671,18 @@ class BadgeInstance(BaseAuditedModel,
         ])
 
         # transform https://www.w3.org/TR/vc-di-eddsa/#transformation-eddsa-rdfc-2022
+        # FIXME: this is pretty slow
         canonicalized_proof = jsonld.normalize(proof, {'algorithm': 'URDNA2015', 'format': 'application/n-quads'})
         canonicalized_json = jsonld.normalize(json, {'algorithm': 'URDNA2015', 'format': 'application/n-quads'})
+
+        # if settings.DEBUG:
+        #     print(canonicalized_proof)
+        #     print(canonicalized_json)
 
         # hash transformed documents, 32bit each
         hashed_proof = sha256(canonicalized_proof.encode()).digest()
         hashed_json = sha256(canonicalized_json.encode()).digest()
+
 
         # concat for 64bit hash ans sign
         signature = private_key.sign(hashed_proof + hashed_json)
