@@ -2088,6 +2088,33 @@ class LearningPath(BaseVersionedEntity, BaseAuditedModel):
     def get_absolute_url(self):
         return reverse('learningpath_json', kwargs={'entity_id': self.entity_id})
 
+    def user_has_completed(self, recipient_identifier):
+        badgeclasses = [lp_badge.badge for lp_badge in self.learningpath_badges]
+        badgeinstances = BadgeInstance.objects.filter(recipient_identifier=recipient_identifier, badgeclass__in=badgeclasses, revoked=False)
+        completed_badges = list({badgeinstance.badgeclass for badgeinstance in badgeinstances})
+
+        max_progress = self.calculate_progress(badgeclasses)
+        user_progress = self.calculate_progress(completed_badges)
+
+        return user_progress >= max_progress
+
+    def user_should_have_badge(self, recipient_identifier):
+
+        if self.user_has_completed(recipient_identifier):
+            # check to only award the participationBadge once
+            badgeinstances = BadgeInstance.objects.filter(badgeclass=self.participationBadge, recipient_identifier=recipient_identifier, revoked=False)
+            return len(badgeinstances) == 0
+
+        return False
+
+    def calculate_progress(self, badgeclasses):
+        return sum(
+            json_loads(ext.original_json)['StudyLoad']
+            for badge in badgeclasses
+            for ext in badge.cached_extensions()
+            if ext.name == 'extensions:StudyLoadExtension'
+        )
+
 class LearningPathBadge(cachemodel.CacheModel):
     learning_path = models.ForeignKey(LearningPath, on_delete=models.CASCADE)
     badge = models.ForeignKey(BadgeClass, on_delete=models.CASCADE)
