@@ -1,8 +1,7 @@
 from django.conf.urls import url
 
 from issuer.api import (BadgeRequestList, IssuerLearningPathList, IssuerList, IssuerDetail, IssuerBadgeClassList, BadgeClassDetail, BadgeInstanceList,
-                        BadgeInstanceDetail, IssuerBadgeInstanceList, AllBadgeClassesList, BatchAssertionsIssue, LearningPathDetail, LearningPathParticipantsList,
-                        QRCodeDetail)
+                        BadgeInstanceDetail, IssuerBadgeInstanceList, AllBadgeClassesList, BatchAssertionsIssue, LearningPathDetail, QRCodeDetail)
 from issuer.api_v1 import FindBadgeClassDetail, IssuerStaffList
 
 urlpatterns = [
@@ -38,7 +37,5 @@ urlpatterns = [
     url(r'^issuers/(?P<slug>[^/]+)/learningpath$',
         IssuerLearningPathList.as_view(), name='v1_api_learningpath_list'),
     url(r'^issuers/(?P<issuerSlug>[^/]+)/learningpath/(?P<slug>[^/]+)$',
-        LearningPathDetail.as_view(), name='v1_api_learningpath_detail'),  
-    url(r'^learningpath/(?P<slug>[^/]+)/participants$',
-        LearningPathParticipantsList.as_view(), name='v1_api_learningpath_participant_list'),    
+        LearningPathDetail.as_view(), name='v1_api_learningpath_detail'),
 ]

@@ -1881,38 +1881,6 @@ class LearningPathBadge(cachemodel.CacheModel):
     def delete(self, *args, **kwargs):
         super(LearningPathBadge, self).delete(*args, **kwargs)
 
-class LearningPathParticipant(BaseVersionedEntity, BaseAuditedModel):
-    user = models.ForeignKey('badgeuser.BadgeUser', on_delete=models.CASCADE)
-    learning_path = models.ForeignKey(LearningPath, on_delete=models.CASCADE)
-    started_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        unique_together = ['user', 'learning_path']
-
-    @property
-    def completed_badges(self):
-        lp_badges = LearningPathBadge.objects.filter(learning_path=self.learning_path)
-        lp_badgeclasses = [lp_badge.badge for lp_badge in lp_badges]
-        badgeinstances = self.user.cached_badgeinstances().filter(badgeclass__in=lp_badgeclasses, revoked=False)
-        badgeclasses = list({badgeinstance.badgeclass for badgeinstance in badgeinstances})
-        return badgeclasses
-        # return self.user.earned_badges.filter(learningpath=self.learning_path)    
-
-    @property
-    def participationBadgeAssertion(self):
-        if self.completed_at is not None:
-            badgeinstance = self.user.cached_badgeinstances().filter(revoked=False, badgeclass=self.learning_path.participationBadge).first()
-            if badgeinstance is not None:
-                return badgeinstance
-        else:
-            return None 
-           
-    @property
-    def cached_user(self):
-        from badgeuser.models import BadgeUser
-        return BadgeUser.cached.get(pk=self.user_id)    
-    
 class RequestedLearningPath(BaseVersionedEntity):
 
     learningpath = models.ForeignKey(LearningPath, blank=False, null=False,

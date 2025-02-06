@@ -27,7 +27,7 @@ from mainsite.serializers import DateTimeWithUtcZAtEndField, HumanReadableBoolea
 from mainsite.utils import OriginSetting, validate_altcha, verifyIssuerAutomatically
 from mainsite.validators import ChoicesValidator, BadgeExtensionValidator, PositiveIntegerValidator, TelephoneValidator
 from .models import Issuer, BadgeClass, IssuerStaff, BadgeInstance, BadgeClassExtension, \
-        RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL, LearningPath, LearningPathBadge, LearningPathParticipant, QrCode, RequestedBadge, RequestedLearningPath
+        RECIPIENT_TYPE_EMAIL, RECIPIENT_TYPE_ID, RECIPIENT_TYPE_URL, LearningPath, LearningPathBadge, QrCode, RequestedBadge, RequestedLearningPath
 
 from badgeuser.models import TermsVersion
 
@@ -818,12 +818,3 @@ class LearningPathSerializerV1(serializers.Serializer):
         instance.save()
 
         return instance
-
-class LearningPathParticipantSerializerV1(serializers.ModelSerializer):
-    user = BadgeUserProfileSerializerV1(source='cached_user')
-    completed_badges = BadgeClassSerializerV1(many=True, read_only=True)
-    participationBadgeAssertion = BadgeInstanceSerializerV1(read_only=True)
-    
-    class Meta:
-        model = LearningPathParticipant
-        fields = ['user', 'started_at', 'completed_at', 'completed_badges', 'entity_id', 'participationBadgeAssertion']
