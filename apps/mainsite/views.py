@@ -351,67 +351,6 @@ def PageSetup(canvas, doc, badgeImage, issuerImage):
     p.wrap(page_width, bottom_10_percent_height)
     p.drawOn(canvas, 0, text_y - 15)
 
-@api_view(["POST", "GET"])
-@permission_classes([IsAuthenticated])
-def requestLearningPath(req, lpId):
-    if req.method != "POST" and req.method != "GET":
-        return JsonResponse(
-            {"error": "Method not allowed"}, status=status.HTTP_400_BAD_REQUEST
-        )
-    try: 
-        lp = LearningPath.objects.get(entity_id=lpId)
-    except LearningPath.DoesNotExist:
-        return JsonResponse({'error': 'Invalid learningPathId'}, status=400) 
-
-    if req.method == "GET":
-        requestedLearningPaths = RequestedLearningPath.objects.filter(learningpath=lp)
-        serializer = RequestedLearningPathSerializer(requestedLearningPaths, many=True)  
-        return JsonResponse({"requested_learningpaths": serializer.data}, status=status.HTTP_200_OK)
-   
-    elif req.method == "POST":           
-
-        requestedLP = RequestedLearningPath() 
-
-        requestedLP.learningpath = lp
-        requestedLP.user = req.user
-
-
-        requestedLP.save()
-
-        return JsonResponse({"message": "LearningPath request received"}, status=status.HTTP_200_OK)
-    
-    elif req.method == "DELETE":
-        requestedLP = RequestedLearningPath.objects.get(learningpath=lp, user=req.user)
-        issuer = lp.issuer
-        if (not is_staff(req.user, issuer)):
-            return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-        requestedLP.delete()
-
-        return JsonResponse({"message": "LearningPath request deleted"}, status=status.HTTP_200_OK)
-
-@api_view(["DELETE"])
-@permission_classes([IsAuthenticated])
-def deleteLpRequest(req, requestId):
-    if req.method != "DELETE":
-        return JsonResponse(
-            {"error": "Method not allowed"}, status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    try:
-        lpReq = RequestedLearningPath.objects.get(entity_id=requestId)
-        lp = lpReq.learningpath
-        issuer = lp.issuer
-
-        if (not is_staff(req.user, issuer)):
-            return Response({'detail': 'Permission denied.'}, status=status.HTTP_403_FORBIDDEN)
-
-    except RequestedLearningPath.DoesNotExist:
-        return JsonResponse({'error': 'Invalid requestId'}, status=400)            
-
-    lpReq.delete()
-
-    return JsonResponse({"message": "Learningpath request deleted"}, status=status.HTTP_200_OK)
-
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])

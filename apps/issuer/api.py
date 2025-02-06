@@ -28,7 +28,8 @@ from issuer.permissions import (MayIssueBadgeClass, MayEditBadgeClass, IsEditor,
                                 BadgrOAuthTokenHasEntityScope, AuthorizationIsBadgrOAuthToken, MayIssueLearningPath,
                                 is_learningpath_editor, is_learningpath_owner, is_learningpath_staff)
 from issuer.serializers_v1 import (IssuerSerializerV1, BadgeClassSerializerV1,
-                                   BadgeInstanceSerializerV1, QrCodeSerializerV1, LearningPathSerializerV1, RequestedBadgeSerializer)
+                                   BadgeInstanceSerializerV1, QrCodeSerializerV1, LearningPathSerializerV1, RequestedBadgeSerializer,
+                                   LearningPathParticipantSerializerV1)
 from issuer.serializers_v2 import IssuerSerializerV2, BadgeClassSerializerV2, BadgeInstanceSerializerV2, \
     IssuerAccessTokenSerializerV2
 from apispec_drf.decorators import apispec_get_operation, apispec_put_operation, \
@@ -253,6 +254,27 @@ class IssuerLearningPathList(UncachedPaginatedViewMixin, VersionedObjectMixin, B
         self.get_object(request, **kwargs)  # trigger a has_object_permissions() check
         return super(IssuerLearningPathList, self).post(request, **kwargs)    
 
+class LearningPathParticipantsList(BaseEntityView):
+    """
+    GET a list of learningpath participants
+    """
+    
+    valid_scopes = ["rw:issuer"]
+
+    def get_queryset(self):
+        learning_path_slug = self.kwargs.get('slug')
+        learning_path = LearningPath.objects.get(entity_id=learning_path_slug)
+        badge_instances = BadgeInstance.objects.filter(badgeclass=learning_path.participationBadge, user__isnull=False, revoked=False)
+        return badge_instances
+    
+    @apispec_list_operation('LearningPath',
+        summary="Get a list of participants for this LearningPath",
+        tags=["LearningPaths"],
+    )
+    def get(self, request, **kwargs):
+        data = self.get_queryset()
+        results = LearningPathParticipantSerializerV1(data, many=True).data
+        return Response(results)
 
 class BadgeClassDetail(BaseEntityDetailView):
     """

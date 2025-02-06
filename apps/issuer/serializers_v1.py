@@ -818,3 +818,7 @@ class LearningPathSerializerV1(serializers.Serializer):
         instance.save()
 
         return instance
+
+class LearningPathParticipantSerializerV1(serializers.Serializer):
+    user = BadgeUserProfileSerializerV1(read_only=True)
+    completed_at = serializers.DateTimeField(source='issued_on')
