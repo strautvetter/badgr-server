@@ -1752,7 +1752,12 @@ class LearningPath(BaseVersionedEntity, BaseAuditedModel):
     
     @property
     def v1_api_participant_count(self):
-        return LearningPathParticipant.objects.filter(learning_path=self).count()
+        # count users with issued lp badges
+        lp_badges = LearningPathBadge.objects.filter(learning_path=self)
+        lp_badgeclasses = [lp_badge.badge for lp_badge in lp_badges]
+        instances = BadgeInstance.objects.filter(badgeclass__in=lp_badgeclasses, revoked=False)
+        users = set([i.user for i in instances])
+        return len(users)
 
     @property
     def cached_badgrapp(self):
