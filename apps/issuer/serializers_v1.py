@@ -721,60 +721,29 @@ class LearningPathSerializerV1(serializers.Serializer):
             representation.update(default_representation)
             return representation
 
-        # FIXME backpack badge filter
+        # get all badgeclasses for this lp
         lp_badges = LearningPathBadge.objects.filter(learning_path=instance)
         lp_badgeclasses = [lp_badge.badge for lp_badge in lp_badges]
-        badgeinstances = request.user.cached_badgeinstances().filter(badgeclass__in=lp_badgeclasses, revoked=False)
-        completed_badges = list({badgeinstance.badgeclass for badgeinstance in badgeinstances})
 
+        # get user completed badges filtered by lp badgeclasses
+        user_badgeinstances = request.user.cached_badgeinstances().filter(badgeclass__in=lp_badgeclasses, revoked=False)
+        user_completed_badges = list({badgeinstance.badgeclass for badgeinstance in user_badgeinstances})
+
+        # calculate lp progress
         max_progress = instance.calculate_progress(lp_badgeclasses)
-        user_progress = instance.calculate_progress(completed_badges)
+        user_progress = instance.calculate_progress(user_completed_badges)
 
+        # set lp completed at from newest badge issue date
+        # FIXME: maybe set from issued participation badge instead, would need to get user participation badgeclass aswell
         completed_at = None
         if user_progress >= max_progress:
-            completed_at = reduce(lambda x, y: y.issued_on if x is None else max(x, y.issued_on), badgeinstances, None)
+            completed_at = reduce(lambda x, y: y.issued_on if x is None else max(x, y.issued_on), user_badgeinstances, None)
 
         representation.update({
             'progress': user_progress,
             'completed_at': completed_at,
-            'completed_badges': BadgeClassSerializerV1(completed_badges, many=True, context={'exclude_orgImg': 'extensions:OrgImageExtension'}).data,
+            'completed_badges': BadgeClassSerializerV1(user_completed_badges, many=True, context={'exclude_orgImg': 'extensions:OrgImageExtension'}).data,
         })
-
-
-        # try:
-        #     participant = LearningPathParticipant.objects.get(learning_path=instance, user=request.user)
-
-        #     requested_lp_exists = RequestedLearningPath.objects.filter(learningpath=instance, user=request.user).exists()
-        #     representation['requested'] = requested_lp_exists
-
-        #     completed_badges = participant.completed_badges
-        #     progress = sum(
-        #         json_loads(ext.original_json)['StudyLoad'] 
-        #         for badge in completed_badges 
-        #         for ext in badge.cached_extensions() 
-        #         if ext.name == 'extensions:StudyLoadExtension'
-        #     )
-
-        #     representation.update({
-        #         'progress': progress,
-        #         'completed_at': participant.completed_at,
-        #         'completed_badges': BadgeClassSerializerV1(participant.completed_badges, many=True, context={'exclude_orgImg': 'extensions:OrgImageExtension'}).data,
-        #     })
-
-        # except LearningPathParticipant.DoesNotExist:
-        #     if request.user.is_authenticated: 
-        #         user_badgeinstances = BadgeInstance.objects.filter(recipient_identifier=request.user.email, revoked=False)
-        #         user_badgeclasses = [badge.badgeclass for badge in user_badgeinstances]
-        #         completed_badgeclasses = {badge for badge in user_badgeclasses if badge in [badge.badge for badge in instance.learningpathbadge_set.all()]}
-        #         completed_badges = BadgeClassSerializerV1(completed_badgeclasses, many=True, context={'exclude_orgImg': 'extensions:OrgImageExtension'}).data
-        #         representation.update({
-        #             'progress': None,
-        #             'completed_at': None,
-        #             'completed_badges': completed_badges,
-        #             'requested': False
-        #         })
-        #     else: 
-        #         representation.update(default_representation)
 
         return representation
 
