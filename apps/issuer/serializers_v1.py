@@ -822,3 +822,8 @@ class LearningPathSerializerV1(serializers.Serializer):
 class LearningPathParticipantSerializerV1(serializers.Serializer):
     user = BadgeUserProfileSerializerV1(read_only=True)
     completed_at = serializers.DateTimeField(source='issued_on')
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['participationBadgeAssertion'] = BadgeInstanceSerializerV1(instance).data
+        return data
