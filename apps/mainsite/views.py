@@ -207,7 +207,8 @@ def aiskills(req, searchterm):
             {"error": "Method not allowed"}, status=status.HTTP_400_BAD_REQUEST
         )
 
-    endpoint = getattr(settings, "AISKILLS_ENDPOINT_CHATS")
+    # fallback to previous setting name
+    endpoint = getattr(settings, "AISKILLS_ENDPOINT_CHATS", getattr(settings, "AISKILLS_ENDPOINT"))
     payload = {
         "text_to_analyze": searchterm
     }
