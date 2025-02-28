@@ -44,7 +44,7 @@ from issuer.tasks import rebake_all_assertions, update_issuedon_all_assertions
 from issuer.models import BadgeClass, LearningPath, QrCode, RequestedBadge, RequestedLearningPath
 from issuer.serializers_v1 import RequestedBadgeSerializer, RequestedLearningPathSerializer
 from mainsite.admin_actions import clear_cache
-from mainsite.models import EmailBlacklist, BadgrApp
+from mainsite.models import EmailBlacklist, BadgrApp, AltchaChallenge
 from mainsite.serializers import LegacyVerifiedAuthTokenSerializer
 from mainsite.utils import OriginSetting, createHash, createHmac
 from random import randrange
@@ -247,17 +247,26 @@ def createCaptchaChallenge(req):
         )
 
     hmac_secret = getattr(settings, "ALTCHA_SECRET")
+    minnumber = getattr(settings, "ALTCHA_MINNUMBER", 10000)
+    maxnumber = getattr(settings, "ALTCHA_MAXNUMBER", 100000)
 
     salt = os.urandom(12).hex()
-    number = randrange(10000, 100000, 1)
+    number = randrange(minnumber, maxnumber, 1)
     challenge = createHash(salt, number)
     signature = createHmac(hmac_secret, challenge)
+
+    altcha_challenge = AltchaChallenge.objects.create(
+        salt=salt,
+        challenge=challenge,
+        signature=signature
+    )
 
     ch = {
         "algorithm": "SHA-256",
         "challenge": challenge,
         "salt": salt,
         "signature": signature,
+        "maxnumber": maxnumber,
     }
 
     return JsonResponse(ch)
