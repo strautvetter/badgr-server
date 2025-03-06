@@ -1304,7 +1304,8 @@ class BadgeInstance(BaseAuditedModel,
                 'download_url': self.public_url + "?action=download",
                 'site_name': "Open Educational Badges",
                 'site_url': badgr_app.signup_redirect,
-                'badgr_app': badgr_app
+                'badgr_app': badgr_app,
+                'oeb_info_block': True
             }
             if badgr_app.cors == 'badgr.io':
                 email_context['promote_mobile'] = True
