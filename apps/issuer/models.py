@@ -1294,7 +1294,7 @@ class BadgeInstance(BaseAuditedModel,
                 'badge_description': self.badgeclass.description,
                 'badge_competencies': competencies,
                 'help_email': getattr(settings, 'HELP_EMAIL', 'info@opensenselab.org'),
-                'issuer_name': re.sub(r'[^\w\s]+', '', self.issuer.name, 0, re.I),
+                'issuer_name': re.sub(r'[^\w\s\-]+', '', self.issuer_name, 0, re.I),
                 'issuer_url': self.issuer.url,
                 'issuer_email': self.issuer.email,
                 'issuer_detail': self.issuer.public_url,
@@ -1307,7 +1307,6 @@ class BadgeInstance(BaseAuditedModel,
                 'site_name': "Open Educational Badges",
                 'site_url': badgr_app.signup_redirect,
                 'badgr_app': badgr_app,
-                'oeb_info_block': True
             }
             if badgr_app.cors == 'badgr.io':
                 email_context['promote_mobile'] = True

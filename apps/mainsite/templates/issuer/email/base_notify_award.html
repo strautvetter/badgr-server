@@ -58,14 +58,16 @@
                                         style="font-size:0px;
                                                word-break:break-word">
                                         <div style="font-family: Rubik, sans-serif;
-                                                    font-size:26px;
+                                                    font-size:24px;
                                                     font-weight: 500;
-                                                    line-height:28.6px;
+                                                    line-height:130%;
                                                     text-align:left;
                                                     color:#323232;
                                                     width: 520px;
                                                     margin: auto; ">
+                                          <span style="font-weight: 900">
                                             Herzlichen Glückwunsch
+                                          </span>
                                             {% if name %}
                                             <br />
                                             <span>
@@ -101,13 +103,13 @@
                                                   style="border:0; display:block; outline:none; text-decoration:none; height:auto; width:175px;">
                                         </a>
                                     </td>
-                                    <td align="center" style="padding-left:20px; vertical-align:middle;">
-                                        <span style="font-family:Rubik; font-size:13px; font-weight:400; line-height:15.6px; color:#323232; font-style:italic">
+                                    <td align="left" style="padding-left:20px; vertical-align:middle;">
+                                        <span style="font-family:Rubik; font-size:18px; font-weight:400; line-height:120%; color:#323232; font-style:italic">
                                             Vergeben von:
                                         </span>
-                                        <div style="font-family:Rubik, sans-serif; font-size:16px; font-weight:400; line-height:24px; color:#000000">
+                                        <div style="font-family:Rubik, sans-serif; font-size:16px; font-weight:600; line-height:24px; color:#323232">
                                             <a href="{{ issuer_detail }}" class="linkstyle"
-                                                style="color:#492e98; font-weight:bold; font-size:13px; text-decoration:none">
+                                                style="color:#323232; font-weight:600; font-size:18px; text-decoration:none; font-style:italic;">
                                                 {{ issuer_name }}
                                             </a>
                                         </div>
@@ -123,16 +125,16 @@
 
                         <tr>
                           <td align="center" style="font-family:Rubik, sans-serif; font-size:14px; color:#000000; text-align:left;">
-                            <div style="font-family: Rubik, sans-serif;font-size:13px;font-weight: 400; line-height:15.6px;text-align:left; width: 472px; margin-left: auto; margin-right: auto;">
-                            <p style="color:#323232;">Du hast erfolgreich an dem Lehrangebot  <span style="color: #492e98">{{ badge_name }}</span> teilgenommen.</p>
+                            <div style="font-family: Rubik, sans-serif;font-size:18px;font-weight: 400; line-height:130%;text-align:left; width: 472px; margin-left: auto; margin-right: auto;">
+                            <p style="color:#323232;">Du hast erfolgreich an dem Lehrangebot  <span style="font-weight: 600;">{{ badge_name }}</span> teilgenommen.</p>
                             </div>  
                           </td> 
                         </tr>
                         {% if badge_competencies %}
                         <tr>
                           <td align="center">
-                            <p style="font-weight: 700; font-size:13px; line-height:16.9px; color:#323232; text-align: left; width: 472px; margin-left: auto; margin-right: auto;">
-                              Dabei hast du folgende Kompetenzen gestärkt: 
+                            <p style="font-weight: 400; font-size:18px; line-height:120%; color:#323232; text-align: left; width: 472px; margin-left: auto; margin-right: auto;">
+                              Dabei hast du folgende <span style="font-weight: 600;">Kompetenzen</span> gestärkt: 
                             </p>
                           </td>
                         </tr>
@@ -146,7 +148,7 @@
                                 <tr>
                                 <td align="left">
                                   <!-- <div style="background-color: #F5F5F5; border-width: 1px; border-style: solid; border-color:#492e98; border-radius: 10px; padding-top: 16px; padding-bottom: 16px; padding-left: 5px; align-items: center; margin-bottom: 0.25rem;"> -->
-                                    <span style="font-family: Rubik, sans-serif;font-size:13px;font-weight: 700; line-height:15.6px; color: #323232">
+                                    <span style="font-family: Rubik, sans-serif;font-size:14px;font-weight: 500; line-height:15.6px; color: #323232">
                                       {{ item.name }} {% if item.framework == "esco" %} <a href= "{{item.framework_identifier}}"> [E] </a> {% endif %} 
                                     </span>
                                     <td>
