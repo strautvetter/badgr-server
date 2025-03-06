@@ -1242,6 +1242,8 @@ class BadgeInstance(BaseAuditedModel,
                 'framework_identifier': competency.get('framework_identifier'),
                 'source': competency.get('source'),
                 'studyLoad': competency.get('studyLoad'),
+                'hours': competency.get('hours'),
+                'minutes': str(competency.get('minutes')).zfill(2),
                 'skill': competency.get('category')
             }
             competencies.append(competency_entry)
