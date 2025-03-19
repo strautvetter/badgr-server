@@ -181,6 +181,8 @@ urlpatterns = [
   
     url(r'^badgeRequests/(?P<badgeSlug>[^/]+)$', badgeRequestsByBadgeClass, name="badge-requests-by-badgeclass"),
 
+    url(r"^v3/", include("issuer.v3_api_urls"), kwargs={"version": "v3"}),
+
 
     # meinBildungsraum OIDC connection
     path('oidc/', include('mozilla_django_oidc.urls')),
