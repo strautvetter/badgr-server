@@ -63,6 +63,8 @@ INSTALLED_APPS = [
 
     # deprecated
     'composition',
+
+    'django_filters'
 ]
 
 MIDDLEWARE = [
