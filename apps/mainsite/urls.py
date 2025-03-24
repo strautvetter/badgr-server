@@ -182,6 +182,7 @@ urlpatterns = [
     url(r'^badgeRequests/(?P<badgeSlug>[^/]+)$', badgeRequestsByBadgeClass, name="badge-requests-by-badgeclass"),
 
     url(r"^v3/", include("issuer.v3_api_urls"), kwargs={"version": "v3"}),
+    url(r"^v3/backpack/", include("backpack.v3_api_urls"), kwargs={"version": "v3"}),
 
 
     # meinBildungsraum OIDC connection
