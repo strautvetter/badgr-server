@@ -614,12 +614,15 @@ def call_cms_api(request, path, params = {}):
     cache_key = md5(url.encode()+json.dumps(params).encode()).digest()
 
     data = cache.get(cache_key)
-    if True or not data:
-        response = requests.get(
-            url, params=params, headers=headers
-        )
-        data = response.json()
-        cache.set(cache_key, data, 60)
+    if not data:
+        try:
+            response = requests.get(
+                url, params=params, headers=headers
+            )
+            data = response.json()
+            cache.set(cache_key, data, 60)
+        except:
+            data = ""
     return JsonResponse(data, safe=False)
 
 def cms_transform_urls(text):
@@ -687,7 +690,12 @@ def cms_api_post_list(request):
 
 def cms_api_styles(request):
     api_response = call_cms_api(request, 'style', {})
-    api_data = json.loads(api_response.content.decode())
+    api_response_content = api_response.content.decode()
+    api_response_content = api_response_content.replace('body.', '.body.')
+    api_response_content = api_response_content.replace('body ', ':host ')
+    api_response_content = api_response_content.replace('body{', ':host{')
+    api_response_content = api_response_content.replace(':root', ':host')
+    api_data = json.loads(api_response_content)
 
     return HttpResponse(api_data, content_type="text/css")
 
