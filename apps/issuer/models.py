@@ -1,6 +1,7 @@
 import base64
 import datetime
 import io
+import math
 import os
 import re
 import urllib.parse
@@ -1143,6 +1144,7 @@ class BadgeClass(
                 ),
                 name=self.name,
                 description=self.description_nonnull,
+                copy_permissions = self.copy_permissions_list,
                 issuer=(
                     self.cached_issuer.jsonld_id
                     if use_canonical_id
@@ -1592,16 +1594,17 @@ class BadgeInstance(BaseAuditedModel, BaseVersionedEntity, BaseOpenBadgeObjectMo
         for competency in competencyExtensions.get(
             "extensions:CompetencyExtension", []
         ):
+            studyload = competency.get("studyLoad")
+            studyloadFmt = "%s:%s h" %  (math.floor(studyload / 60), str(studyload % 60).zfill(2))
+
             competency_entry = {
                 "name": competency.get("name"),
                 "description": competency.get("description"),
                 "framework": competency.get("framework"),
                 "framework_identifier": competency.get("framework_identifier"),
                 "source": competency.get("source"),
-                "studyLoad": competency.get("studyLoad"),
+                "studyLoad": studyloadFmt,
                 "skill": competency.get("category"),
-                "hours": competency.get("hours"),
-                "minutes": str(competency.get("minutes")).zfill(2),
             }
             competencies.append(competency_entry)
 
