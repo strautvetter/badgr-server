@@ -5,29 +5,31 @@ import json
 from django.conf import settings
 from django.core import management
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 def badgeinstance_generate_ob2_json(apps, schema):
     # try to populate during migration
     try:
-        print('\n  running command issuer:populate_badgeinstance_ob_json_2_0...')
-        management.call_command('populate_badgeinstance_ob_json_2_0')
+        print("\n  running command issuer:populate_badgeinstance_ob_json_2_0...")
+        management.call_command("populate_badgeinstance_ob_json_2_0")
     except:
         pass
+
 
 class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('issuer', '0071_issuerstaffrequest'),
+        ("issuer", "0073_auto_20250408_1502"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='badgeinstance',
-            name='ob_json_2_0',
+            model_name="badgeinstance",
+            name="ob_json_2_0",
             field=models.TextField(blank=True, default=None, null=True),
         ),
-        migrations.RunPython(code=badgeinstance_generate_ob2_json, reverse_code=migrations.RunPython.noop)
+        migrations.RunPython(
+            code=badgeinstance_generate_ob2_json, reverse_code=migrations.RunPython.noop
+        ),
     ]
