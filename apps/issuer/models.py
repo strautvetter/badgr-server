@@ -786,31 +786,38 @@ def get_user_or_none(recipient_id, recipient_type):
 
     return user
 
+
 class IssuerStaffRequest(BaseVersionedEntity):
     class Status(models.TextChoices):
-        PENDING = 'Pending', 'Pending'
-        APPROVED = 'Approved', 'Approved'
-        REJECTED = 'Rejected', 'Rejected'
-        REVOKED = 'Revoked', 'Revoked'
+        PENDING = "Pending", "Pending"
+        APPROVED = "Approved", "Approved"
+        REJECTED = "Rejected", "Rejected"
+        REVOKED = "Revoked", "Revoked"
 
-    issuer = models.ForeignKey(Issuer, blank=False, null=False,
-                               on_delete=models.CASCADE, related_name='staffrequests')
-    user = models.ForeignKey('badgeuser.BadgeUser', blank=True, null=True, on_delete=models.CASCADE)
+    issuer = models.ForeignKey(
+        Issuer,
+        blank=False,
+        null=False,
+        on_delete=models.CASCADE,
+        related_name="staffrequests",
+    )
+    user = models.ForeignKey(
+        "badgeuser.BadgeUser", blank=True, null=True, on_delete=models.CASCADE
+    )
     requestedOn = models.DateTimeField(blank=False, null=False, default=timezone.now)
     status = models.CharField(
-        max_length=254, 
-        choices=Status.choices, 
-        default=Status.PENDING
+        max_length=254, choices=Status.choices, default=Status.PENDING
     )
     revoked = models.BooleanField(default=False, db_index=True)
 
     def revoke(self):
         if self.revoked:
             raise ValidationError("Membership request is already revoked")
-        
+
         self.revoked = True
         self.status = self.Status.REVOKED
         self.save()
+
 
 class BadgeClass(
     ResizeUploadedImage,
@@ -1355,6 +1362,8 @@ class BadgeInstance(BaseAuditedModel, BaseVersionedEntity, BaseOpenBadgeObjectMo
         slug_kwarg_name="entity_id", slug_field_name="entity_id"
     )
 
+    ob_json_2_0 = models.TextField(blank=True, null=True, default=None)
+
     class Meta:
         index_together = (("recipient_identifier", "badgeclass", "revoked"),)
 
@@ -1755,8 +1764,37 @@ class BadgeInstance(BaseAuditedModel, BaseVersionedEntity, BaseOpenBadgeObjectMo
         expand_issuer=False,
         include_extra=True,
         use_canonical_id=False,
+        force_recreate=False
     ):
-        obi_version, context_iri = get_obi_context(obi_version)
+
+        # FIXME: 'support' 1_1 for v1 serializer classes
+        if obi_version == '1_1':
+            obi_version = '2_0'
+
+        if obi_version == '2_0':
+
+            if not self.ob_json_2_0 or force_recreate:
+                self.ob_json_2_0 = json_dumps(self.get_json_2_0())
+                self.save(update_fields=['ob_json_2_0'])
+
+            json = json_loads(self.ob_json_2_0, object_pairs_hook=OrderedDict)
+
+            # FIXME: special case
+            # badgr-ui frontend uses this to display the public/assertions/ endpoint
+            # also maybe social media sharing / widget.ts to display badge name
+            if expand_badgeclass:
+                json["badge"] = self.cached_badgeclass.get_json(obi_version=obi_version)
+                json["badge"]["slug"] = self.cached_badgeclass.entity_id
+                if expand_issuer:
+                    json["badge"]["issuer"] = self.cached_issuer.get_json(obi_version=obi_version)
+
+            return json
+
+        raise NotImplementedError("Unsupported OB Version")
+
+    def get_json_2_0(self):
+
+        obi_version, context_iri = get_obi_context('2_0')
 
         json = OrderedDict(
             [
@@ -1781,17 +1819,6 @@ class BadgeInstance(BaseAuditedModel, BaseVersionedEntity, BaseOpenBadgeObjectMo
                 json["image"] = image_info
                 json["image"]["id"] = image_url
 
-        if expand_badgeclass:
-            json["badge"] = self.cached_badgeclass.get_json(
-                obi_version=obi_version, include_extra=include_extra
-            )
-            json["badge"]["slug"] = self.cached_badgeclass.entity_id
-
-            if expand_issuer:
-                json["badge"]["issuer"] = self.cached_issuer.get_json(
-                    obi_version=obi_version, include_extra=include_extra
-                )
-
         if self.revoked:
             return OrderedDict(
                 [
@@ -1800,9 +1827,7 @@ class BadgeInstance(BaseAuditedModel, BaseVersionedEntity, BaseOpenBadgeObjectMo
                     (
                         "id",
                         (
-                            self.jsonld_id
-                            if use_canonical_id
-                            else add_obi_version_ifneeded(self.jsonld_id, obi_version)
+                            add_obi_version_ifneeded(self.jsonld_id, obi_version)
                         ),
                     ),
                     ("revoked", self.revoked),
@@ -1813,41 +1838,22 @@ class BadgeInstance(BaseAuditedModel, BaseVersionedEntity, BaseOpenBadgeObjectMo
                 ]
             )
 
-        if obi_version == "1_1":
-            json["uid"] = self.entity_id
-            json["verify"] = {
-                "url": (
-                    self.public_url
-                    if use_canonical_id
-                    else add_obi_version_ifneeded(self.public_url, obi_version)
-                ),
-                "type": "hosted",
-            }
-        elif obi_version == "2_0":
-            json["verification"] = {"type": "HostedBadge"}
+        json["verification"] = {"type": "HostedBadge"}
 
         # source url
         if self.source_url:
-            if obi_version == "1_1":
-                json["source_url"] = self.source_url
-                json["hosted_url"] = OriginSetting.HTTP + self.get_absolute_url()
-            elif obi_version == "2_0":
-                json["sourceUrl"] = self.source_url
-                json["hostedUrl"] = OriginSetting.HTTP + self.get_absolute_url()
+            json["sourceUrl"] = self.source_url
+            json["hostedUrl"] = OriginSetting.HTTP + self.get_absolute_url()
 
         # evidence
         if self.evidence_url:
-            if obi_version == "1_1":
-                # obi v1 single evidence url
-                json["evidence"] = self.evidence_url
-            elif obi_version == "2_0":
-                # obi v2 multiple evidence
-                json["evidence"] = [
-                    e.get_json(obi_version) for e in self.cached_evidence()
-                ]
+            # obi v2 multiple evidence
+            json["evidence"] = [
+                e.get_json(obi_version) for e in self.cached_evidence()
+            ]
 
         # narrative
-        if self.narrative and obi_version == "2_0":
+        if self.narrative:
             json["narrative"] = self.narrative
 
         # issuedOn / expires
@@ -1877,14 +1883,6 @@ class BadgeInstance(BaseAuditedModel, BaseVersionedEntity, BaseOpenBadgeObjectMo
         if len(self.cached_extensions()) > 0:
             for extension in self.cached_extensions():
                 json[extension.name] = json_loads(extension.original_json)
-
-        # pass through imported json
-        if include_extra:
-            extra = self.get_filtered_json()
-            if extra is not None:
-                for k, v in list(extra.items()):
-                    if k not in json:
-                        json[k] = v
 
         return json
 
@@ -2008,6 +2006,7 @@ class BadgeInstance(BaseAuditedModel, BaseVersionedEntity, BaseOpenBadgeObjectMo
                 expand_issuer=True,
                 expand_badgeclass=True,
                 include_extra=True,
+                force_recreate=True
             )
             badgeclass_name, ext = os.path.splitext(self.badgeclass.image.file.name)
             new_image = io.BytesIO()
@@ -2199,9 +2198,18 @@ class QrCode(BaseVersionedEntity):
 
     createdBy = models.CharField(max_length=254, blank=False, null=False)
 
+    created_by_user = models.ForeignKey(
+        "badgeuser.BadgeUser",
+        null=True,
+        related_name="+",
+        on_delete=models.SET_NULL,
+    )
+
     valid_from = models.DateTimeField(blank=True, null=True, default=None)
 
     expires_at = models.DateTimeField(blank=True, null=True, default=None)
+
+    notifications = models.BooleanField(null=False, default=False)
 
 
 class RequestedBadge(BaseVersionedEntity):
