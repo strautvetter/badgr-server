@@ -46,7 +46,7 @@ class IssuerBadgeclasses(ReadOnlyInline):
 
     def get_queryset(self, request):
         qs = super(IssuerBadgeclasses, self).get_queryset(request)
-        qs = qs.annotate(number_of_assertions=models.Count('badgeinstances'))
+        qs = qs.annotate(number_of_assertions=models.Count('badgeinstances', filter=models.Q(badgeinstances__revoked=False)))
         qs = qs.annotate(number_of_qrcodes=models.Count('qrcodes'))
         return qs
 
@@ -204,7 +204,7 @@ class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
 
     def get_queryset(self, request):
         qs = super(BadgeClassAdmin, self).get_queryset(request)
-        qs = qs.annotate(number_of_assertions=models.Count('badgeinstances'))
+        qs = qs.annotate(number_of_assertions=models.Count('badgeinstances', filter=models.Q(badgeinstances__revoked=False)))
         return qs
 
     def save_model(self, request, obj, form, change):
