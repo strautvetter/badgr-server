@@ -244,12 +244,12 @@ class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
     form = BadgeModelForm
 
     readonly_fields = ('created_by', 'created_at', 'updated_at', 'old_json',
-                       'source', 'source_url', 'entity_id', 'slug')
+                       'source', 'source_url', 'entity_id', 'slug', 'criteria')
     list_display = ('badge_image', 'name', 'issuer_link', 'assertion_count')
     list_display_links = ('badge_image', 'name',)
     list_filter = ('created_at',)
     search_fields = ('name', 'entity_id', 'issuer__name',)
-    raw_id_fields = ('issuer',)
+    raw_id_fields = ('issuer', )
     fieldsets = (
         (
             "Metadata",
@@ -279,7 +279,7 @@ class BadgeClassAdmin(DjangoObjectActions, ModelAdmin):
                 )
             },
         ),
-        ("JSON", {"fields": ("old_json",)}),
+        ("JSON", {"fields": ("old_json", "criteria")}),
     )
     inlines = [
         BadgeClassTagInline,
